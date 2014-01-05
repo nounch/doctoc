@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Documentation</title>
+    <link rel="stylesheet" href="{{ site.url }}/css/foundation.min.css" type="text/css" />
+    <meta charset="utf-8" />
+
+  </head>
+  
+  <body>
+
+    {{ page.toc }}
+
+
+    <div class="row">
+      <div class="columns large-12">
+	<h1>Documentation</h1>
+      </div>
+      <div class="columns large-6">
+	{{ content }}
+      </div>
+      <div class="columns large-4">
+	{% toc %}
+      </div>
+    </div>
+
+    <script type="text/javascript" src=""></script>
+  </body>
+</html>
