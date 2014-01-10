@@ -1,5 +1,3 @@
-require 'pp'
-
 ###########################################################################
 # TOC Plugin
 ###########################################################################
@@ -36,18 +34,38 @@ module Toc
       counter -= 1
     end
 
-    def html
-      self.htmlize([]).join("\n")
+    def html(children_only=false)
+      children_empty_states = @children.collect { |c| c.children.empty? }
+      is_flat = !children_empty_states.select { |c| c == true}.empty?
+
+      html = []
+      if !@children.empty? && is_flat
+        # Completely flat lists
+        html << '<ul>'
+        @children.each do |c|
+          html << "<li><a href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+        end
+        html << '</ul>'
+        html.join("\n")
+      else
+        # Arbitrarily deeply nested lists
+        if children_only
+          @children.each { |child| html << child.htmlize([]) }
+          html.join("\n")
+        else
+          self.htmlize([]).join("\n")
+        end
+      end
     end
 
-    def htmlize(html, previous_children_empty=false)
+    def htmlize(html, previous_children_empty=nil)
       # Leaf nodes should not be lists themselves
       if !@children.empty?
         html << '<ul>'
-
       end
 
-      if !previous_children_empty && @children.empty?
+      if previous_children_empty != true && @children.empty? &&
+          Tree.current_children_empty != true
         html << '<ul>'
       end
 
@@ -58,6 +76,7 @@ module Toc
       # block would not work since it could not access the outer scope
       # correctly.
       Tree.current_children_empty = @children.empty?  # Semi-global state!
+
       @children.each do |child|
         child.htmlize html, Tree.current_children_empty
       end
@@ -67,7 +86,8 @@ module Toc
         html << '</ul>'
       end
 
-      if !previous_children_empty && !@children.empty?
+      if previous_children_empty != true && !@children.empty? &&
+          !Tree.current_children_empty != true
         html << '</ul>'
       end
 
@@ -206,8 +226,8 @@ module Toc
 
       toc = ''
       # Exclude the top level node since displaying `root' on the site
-      # by default makes no sense. If still, this can still be achieved by
-      # the user by wrapping the Liquid TOC tag in a HTML list tag.
+      # by default makes no sense. If necessary, this can still be achieved
+      # by the user by wrapping the Liquid TOC tag in a HTML list tag.
       path_tree.find(@top_level_dir_name,
                      path_tree.root, true).children.each do |child|
         toc += child.html
@@ -232,9 +252,9 @@ module Jekyll
 
   class TocTag < Liquid::Tag
 
-    def initialize(tag_name, path, tokens)
+    def initialize(tag_name, text, tokens)
       super
-      @path = path
+      @text = text
     end
 
     def render(context)
@@ -246,12 +266,27 @@ module Jekyll
       #  context.registers[:site].pages
       # Anyone making a Jekyll plugin should know that.
 
+      html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       toc = toc_tree.find('/' +
                           File.dirname(context.registers[:page]['path']),
                           toc_tree.root, true)
-      # In case there is no TOC node found
-      toc == nil ? '' : toc.html
+
+      # In case there is no TOC node found or the TOC node that has been
+      # found is a leaf node there should not be any HTML emitted.
+      if toc == nil || toc.children.empty?
+        html = ''
+        if !@text.empty?
+          html += @text
+        end
+      else
+        # Exclude the current node since displaying a link to it on its own
+        # site by default makes no sense. If necessary, this can still be
+        # achieved by the user by wrapping the Liquid TOC tag in a HTML
+        # list tag.
+        html += toc.html true
+        html
+      end
     end
 
   end
