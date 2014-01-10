@@ -1,3 +1,5 @@
+require 'pp'
+
 ###########################################################################
 # TOC Plugin
 ###########################################################################
@@ -139,6 +141,17 @@ module Toc
       return @last_found_node
     end
 
+    def find_parent(node_name, node=@root, parent_node=nil)
+      node.children.each do |child|
+        if !(child.name == node_name)
+          self.find_parent(node_name, child, child)
+        else
+          @last_found_node = parent_node
+        end
+      end
+      return @last_found_node
+    end
+
     def insert_child(node_name, new_node, node=@root)
       node.children.each do |child|
         if child.name == node_name
@@ -244,17 +257,21 @@ module Toc
 end
 
 
-###########################################################################
-# TOC Tag
-###########################################################################
 
 module Jekyll
 
-  class TocTag < Liquid::Tag
+
+  #########################################################################
+  # `doctoc' Tag
+  #########################################################################
+
+  class DocTocTag < Liquid::Tag
 
     def initialize(tag_name, text, tokens)
       super
       @text = text
+      # Special marker for parent links
+      @parent_node_marker = 'parent-node'
     end
 
     def render(context)
@@ -277,7 +294,26 @@ module Jekyll
       if toc == nil || toc.children.empty?
         html = ''
         if !@text.empty?
-          html += @text
+
+          # Link to the parent node when on a leaf node page
+          if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
+            path = toc_tree.find_parent(toc.name).name
+            link_text = ''
+
+            if @text =~ /^ *#{Regexp.quote(@parent_node_marker)} *$/
+              link_text = File.basename path
+            else
+              link_text =
+                @text.gsub(/^ *#{Regexp.quote(@parent_node_marker)} *, */,
+                           '')
+            end
+
+            html += "<a href=\"#{path}\">#{link_text}</p>"
+
+          else
+            html += @text
+          end
+
         end
       else
         # Exclude the current node since displaying a link to it on its own
@@ -285,12 +321,59 @@ module Jekyll
         # achieved by the user by wrapping the Liquid TOC tag in a HTML
         # list tag.
         html += toc.html true
-        html
+
+        # top_level_nodes = []
+        # # toc.children.each do |child|
+        # #   top_level_nodes << child.name
+        # # end
+        # top_level_nodes << toc.name
+        # context.registers[:site].data['top_level_nodes'] = top_level_nodes
+
       end
+      html
+    end
+
+  end
+
+
+  #########################################################################
+  # `doctoc-up' Tag
+  #########################################################################
+
+  class DocTocUpTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+    end
+
+    def render(context)
+
+      html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      toc = toc_tree.
+        find_parent('/' + File.dirname(context.registers[:page]['path']))
+      
+      if toc_tree.root.children.collect { |c| c.name }.include? toc.name
+        html = ''
+      else
+        link_text = ''
+
+        if !@text.empty?
+          link_text += @text.strip
+        else
+          link_text = File.basename(toc.name)
+        end
+
+        html += "<a href=\"#{toc.name}\">#{link_text}</a>"
+      end
+
+      html
     end
 
   end
 
 end
 
-Liquid::Template.register_tag('doctoc', Jekyll::TocTag)
+Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
+Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)

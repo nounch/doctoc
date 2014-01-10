@@ -11,22 +11,36 @@
 
 
     <div class="row">
-      <div class="columns large-12">
-        <h1>Documentation</h1>
-      </div>
-      <div class="columns large-3">
-        <div class="panel">
-          {{ page.doctoc }}
+      <div class="row">
+        <div class="columns large-12">
+          <h1>Documentation</h1>
         </div>
       </div>
-      <div class="columns large-6">
-        {{ content }}
-      </div>
-      <div class="columns large-3">
-        <div class="panel callout">
-          {% doctoc <em style="color: #FF0000;">OVERVIEW</em>%}
+
+      <div class="row">
+        <div class="columns large-3">
+          <div class="panel">
+            {{ page.doctoc }}
+          </div>
+        </div>
+        <div class="columns large-6">
+
+          <div class="row">
+            <div class="columns large-12 panel">
+              {% doctoc_up Go up %}
+            </div>
+          </div>
+
+          {{ content }}
+        </div>
+        <div class="columns large-3">
+          <div class="panel callout">
+            <!-- {% doctoc <em style="color: #FF0000;">OVERVIEW</em>%} -->
+            {% doctoc parent-node, Parent node %}
+          </div>
         </div>
       </div>
+
     </div>
 
     <script type="text/javascript" src=""></script>
