@@ -11,6 +11,7 @@ module Toc
   # Path Tree
   #========================================================================
 
+
   class TreeNode
     attr_accessor :name, :data, :children, :html_string
 
@@ -39,15 +40,38 @@ module Toc
       self.htmlize([]).join("\n")
     end
 
-    def htmlize(html)
-      html << '<ul>'
-      html << "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
+    def htmlize(html, previous_children_empty=false)
+      # Leaf nodes should not be lists themselves
+      if !@children.empty?
+        html << '<ul>'
 
-      @children.each do |child|
-        child.htmlize html
       end
 
-      html << '</ul>'
+      if !previous_children_empty && @children.empty?
+        html << '<ul>'
+      end
+
+      html << "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
+
+      # The semi-global state (storing something on the `Tree' class) is
+      # necessary since `@children.empty?' within the `@children.each''s
+      # block would not work since it could not access the outer scope
+      # correctly.
+      Tree.current_children_empty = @children.empty?  # Semi-global state!
+      @children.each do |child|
+        child.htmlize html, Tree.current_children_empty
+      end
+
+      # Leaf nodes should not be lists themselves
+      if !@children.empty?
+        html << '</ul>'
+      end
+
+      if !previous_children_empty && !@children.empty?
+        html << '</ul>'
+      end
+
+      html
     end
 
   end
@@ -59,6 +83,18 @@ module Toc
     def initialize(root)
       @root = root
       @last_found_node = nil  # Semi-global state!
+      # Note: Do not use the following variable anywhere else than in
+      # `TreeNode::htmlize' since it is essentially semi-global state.
+      # If you rebell still do it, at least update this comment!
+      @current_children_empty  # Semi-global state!
+    end
+
+    def Tree::current_children_empty
+      @current_children_empty
+    end
+
+    def Tree::current_children_empty=(value)
+      @current_children_empty = value
     end
 
     def find(node_name, node, is_node=false)
@@ -131,6 +167,7 @@ module Toc
       super
       @tree = {}
       @nested_list = ''
+      @top_level_dir_name = '/pages'
     end
 
     def generate_tree(pathes)
@@ -159,15 +196,24 @@ module Toc
       generate_tree(page_pathes)
 
       path_tree = Tree.new(TreeNode.new('root', ['data'],
-                                        [TreeNode.new('/pages',
+                                        [TreeNode.new(@top_level_dir_name,
                                                       ['data'])]))
 
-      path_tree.insert_pathes({'/pages' => @tree['/pages'] })
+      path_tree.insert_pathes({@top_level_dir_name =>
+                                @tree[@top_level_dir_name] })
 
       # TOC for the whole site
-      toc = path_tree.html
+
+      toc = ''
+      # Exclude the top level node since displaying `root' on the site
+      # by default makes no sense. If still, this can still be achieved by
+      # the user by wrapping the Liquid TOC tag in a HTML list tag.
+      path_tree.find(@top_level_dir_name,
+                     path_tree.root, true).children.each do |child|
+        toc += child.html
+      end
       site.pages.each do |page|
-        page.data['toc'] = toc
+        page.data['doctoc'] = toc
       end
 
       # Attach the TOC to the site object so that it can be used elsewhere
@@ -212,4 +258,4 @@ module Jekyll
 
 end
 
-Liquid::Template.register_tag('toc', Jekyll::TocTag)
+Liquid::Template.register_tag('doctoc', Jekyll::TocTag)
