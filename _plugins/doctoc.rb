@@ -1,3 +1,9 @@
+require 'pp'
+
+###########################################################################
+# TOC Plugin
+###########################################################################
+
 module Toc
 
 
@@ -116,7 +122,7 @@ module Toc
 
 
   #========================================================================
-  # Plugin
+  # Actual Plugin
   #========================================================================
 
   class Generator < Jekyll::Generator
@@ -158,13 +164,52 @@ module Toc
 
       path_tree.insert_pathes({'/pages' => @tree['/pages'] })
 
+      # TOC for the whole site
       toc = path_tree.html
-
       site.pages.each do |page|
         page.data['toc'] = toc
       end
 
+      # Attach the TOC to the site object so that it can be used elsewhere
+      site.data[:toc_tree] = path_tree
     end
   end
 
 end
+
+
+###########################################################################
+# TOC Tag
+###########################################################################
+
+module Jekyll
+
+  class TocTag < Liquid::Tag
+
+    def initialize(tag_name, path, tokens)
+      super
+      @path = path
+    end
+
+    def render(context)
+      #--------------------------------------------------------------------
+      # Info
+      #--------------------------------------------------------------------
+      #
+      # The list of pages is available like this:
+      #  context.registers[:site].pages
+      # Anyone making a Jekyll plugin should know that.
+
+      toc_tree = context.registers[:site].data[:toc_tree]
+      toc = toc_tree.find('/' +
+                          File.dirname(context.registers[:page]['path']),
+                          toc_tree.root, true)
+      # In case there is no TOC node found
+      toc == nil ? '' : toc.html
+    end
+
+  end
+
+end
+
+Liquid::Template.register_tag('toc', Jekyll::TocTag)
