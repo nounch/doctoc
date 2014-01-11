@@ -240,6 +240,7 @@ module Jekyll
         @tree = {}
         @nested_list = ''
         @top_level_dir_name = '/pages'
+        @prev_next_list = []
       end
 
       def generate_index_pages(site, pathes, path_tree, toc)
@@ -258,9 +259,11 @@ module Jekyll
                                   File.basename(referrer_path),
                                   'doctoc' => toc,
                                   'path' =>
-                                  File.join(path_tree.find(k, path_tree.root).name,
+                                  File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, ''),
                                             'index.html'),
                                   'current_node' => File.basename(k),
+                                  'doctoc_prev_next_list' =>
+                                  @prev_next_list
                                 },
                                 @top_level_dir_name)
 
@@ -285,6 +288,13 @@ module Jekyll
           end
 
           self.generate_index_pages(site, value, path_tree, toc)
+        end
+      end
+
+      def generate_prev_next_list(pathes)
+        pathes.each_pair do |key, value|
+          @prev_next_list << key if File.basename(key) != 'index.html'
+          self.generate_prev_next_list value
         end
       end
 
@@ -332,8 +342,15 @@ module Jekyll
                        path_tree.root, true).children.each do |child|
           toc += child.html
         end
+
+        # Generate `previous'/`next' link references
+        self.generate_prev_next_list @tree
+        @prev_next_list = @prev_next_list[1..-1]
+
+        # Add shared data to each page
         site.pages.each do |page|
           page.data['doctoc'] = toc
+          page.data['doctoc_prev_next_list'] = @prev_next_list
         end
 
         # Attach the TOC to the site object so that it can be used
@@ -417,7 +434,7 @@ module Jekyll
 
 
   #########################################################################
-  # `doctoc-up' Tag
+  # `doctoc_up' Tag
   #########################################################################
 
   class DocTocUpTag < Liquid::Tag
@@ -465,8 +482,152 @@ module Jekyll
   end
 
 
+  #########################################################################
+  # `doctoc_previous' Tag
+  #########################################################################
+
+  class DocTocPreviousTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+      # Markers
+      @prev_with_parens = 'prev_with_parens'
+      @prev_only_name = 'only_name'
+      @prev_only_prev = 'only_prev'
+      @prev_only_prev_small_caps = 'only_prev_small_caps'
+      @prev_custom = 'custom'
+    end
+
+    def render(context)
+      html = ''
+
+      path = File.dirname(File.join('/', context.registers[:page]['path']))
+      prev_next_list = context.registers[:page]['doctoc_prev_next_list']
+
+      index = nil
+      if prev_next_list != nil
+        index = prev_next_list.index(path)
+      end
+
+      prev_path = prev_next_list[index - 1]
+
+      # The `nil' test ensures that Jekyll will not terminate when no
+      # valid index is returned.
+      if index != nil
+        html = "<a href=\"#{prev_path}\">Previous</a>"
+      end
+      if !@text.empty?
+
+        if @text =~ /^ *#{Regexp.quote(@prev_with_parens)} *$/
+          html = "<a href=\"#{prev_path}\">Previous (\
+#{File.basename prev_path})</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@prev_only_name)} *$/
+          html = "<a href=\"#{prev_path}\">#{File.basename prev_path}</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@prev_only_prev)} *$/
+          html = "<a href=\"#{prev_path}\">Previous</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@prev_only_prev_small_caps)} *$/
+          html = "<a href=\"#{prev_path}\">previous</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@prev_custom)} *,/
+          replacement =
+            @text.gsub(/^ *#{Regexp.quote(@prev_custom)} *,/, '')
+          html = "<a href=\"#{prev_path}\">#{replacement}</a>"
+        end
+
+      end
+
+      html
+    end
+
+  end
+
+
+  #########################################################################
+  # `doctoc_next' Tag
+  #########################################################################
+
+  class DocTocNextTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+      # Markers
+      @next_with_parens = 'next_with_parens'
+      @next_only_name = 'only_name'
+      @next_only_next = 'only_next'
+      @next_only_next_small_caps = 'only_next_small_caps'
+      @next_custom = 'custom'
+    end
+
+    def render(context)
+      html = ''
+
+      path = File.dirname(File.join('/', context.registers[:page]['path']))
+      prev_next_list = context.registers[:page]['doctoc_prev_next_list']
+
+      index = nil
+      if prev_next_list != nil
+        idx = prev_next_list.index(path)
+
+        if idx >= (prev_next_list.length - 1)
+          index = -1
+        else
+          index = idx
+        end
+
+      end
+
+      next_path = prev_next_list[index + 1]
+
+      # The `nil' test ensures that Jekyll will not terminate when no
+      # valid index is returned.
+      if index != nil
+        html = "<a href=\"#{next_path}\">Next</a>"
+      end
+      if !@text.empty?
+
+        if @text =~ /^ *#{Regexp.quote(@next_with_parens)} *$/
+          html = "<a href=\"#{next_path}\">Next (\
+#{File.basename next_path})</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@next_only_name)} *$/
+          html = "<a href=\"#{next_path}\">#{File.basename next_path}</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@next_only_next)} *$/
+          html = "<a href=\"#{next_path}\">Next</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@next_only_next_small_caps)} *$/
+          html = "<a href=\"#{next_path}\">next</a>"
+        end
+
+        if @text =~ /^ *#{Regexp.quote(@next_custom)} *,/
+          replacement =
+            @text.gsub(/^ *#{Regexp.quote(@next_custom)} *,/, '')
+          html = "<a href=\"#{next_path}\">#{replacement}</a>"
+        end
+
+      end
+
+      html
+    end
+
+  end
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
+  Liquid::Template.register_tag('doctoc_prev', Jekyll::DocTocPreviousTag)
+  Liquid::Template.register_tag('doctoc_next', Jekyll::DocTocNextTag)
 
 end

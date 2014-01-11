@@ -14,7 +14,7 @@
       <div class="row">
         <div class="columns large-12">
           <h1>Documentation</h1>
-	  <p>{{ page.path }}</p>
+          <p>{{ page.path }}</p>
         </div>
       </div>
 
@@ -33,6 +33,60 @@
           </div>
 
           {{ content }}
+
+
+          <div class="row panel callout">
+            <div class="column large-12">
+
+              <div class="row">
+                <div class="column large-6">
+                  <p>{% doctoc_prev prev_with_parens %}</p>
+                </div>
+                <div class="column large-6">
+                  <p>{% doctoc_next next_with_parens %}</p>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="column large-6">
+                  <p>{% doctoc_prev only_name %}</p>
+                </div>
+                <div class="column large-6">
+                  <p>{% doctoc_next only_name %}</p>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="column large-6">
+                  <p>{% doctoc_prev only_prev %}</p>
+                </div>
+                <div class="column large-6">
+                  <p>{% doctoc_next only_next %}</p>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="column large-6">
+                  <p>{% doctoc_prev only_prev_small_caps %}</p>
+                </div>
+                <div class="column large-6">
+                  <p>{% doctoc_next only_next_small_caps %}</p>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="column large-6">
+                  <p>{% doctoc_prev custom, &#8249; PREV %}</p>
+                </div>
+                <div class="column large-6">
+                  <p>{% doctoc_next custom, NEXT &#8250; %}</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+
         </div>
         <div class="columns large-3">
           <div class="panel callout">
