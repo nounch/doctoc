@@ -256,7 +256,11 @@ module Jekyll
                                   'referrer' => referrer_path,
                                   'referrer_name' =>
                                   File.basename(referrer_path),
-                                  'doctoc' => toc
+                                  'doctoc' => toc,
+                                  'path' =>
+                                  File.join(path_tree.find(k, path_tree.root).name,
+                                            'index.html'),
+                                  'current_node' => File.basename(k),
                                 },
                                 @top_level_dir_name)
 
@@ -443,7 +447,16 @@ module Jekyll
           link_text = File.basename(toc.name)
         end
 
+        # Required for `_fallback/index.html' since it is automatically
+        # generated which leads to `page.path' not being correct after
+        # it has been attached to it artivicially when creating the
+        # respective `IndexPage'. For some reason Jekyll does not seem
+        # to catch up.
+        if toc.name == File.dirname(context.registers[:page]['path'])
+          toc.name = File.dirname toc.name
+        end
         html += "<a href=\"#{toc.name}\">#{link_text}</a>"
+
       end
 
       html

@@ -5,7 +5,9 @@ permalink: /
 ---
 
 <div class="fallback">
-  <h2>Fallback</h2>
+  <h2>{{ page.current_node }} <em>(Fallback)</em></h2>
   <p>There is not much to find at this note.</p>
   <p>Instead, go one level up to <strong><a href="{{ page.referrer }}">{{ page.referrer_name }}</a></strong>.</p>
+
+  {% doctoc_up %}
 </div>
