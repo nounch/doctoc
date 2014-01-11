@@ -1,264 +1,347 @@
 require 'pp'
 
-###########################################################################
-# TOC Plugin
-###########################################################################
+module Jekyll
 
-module Toc
-
-
-  #========================================================================
-  # Path Tree
-  #========================================================================
-
-
-  class TreeNode
-    attr_accessor :name, :data, :children, :html_string
-
-    def initialize(name, data, children = [])
-      @name = name
-      @data = data
-      @children = children
-
-      @pp_indentation_width = 2
-      @html_string = []
+  # XXX: This is a workaround necessary to prevent Jekyll from eagerly
+  # cleaning up new `IndexPage' files after they have been written to
+  # `site'.
+  #
+  # This is a known Jekyll bug (#268):
+  #   https://github.com/jekyll/jekyll/issues/268
+  class Site
+    def process
+      self.reset
+      self.read
+      self.cleanup
+      self.generate
+      self.render
+      self.write
     end
+  end
 
-    def pp(counter, string)
-      string << ' ' * (counter * @pp_indentation_width) +
-        File.basename(@name) + "\n"
-      counter += 1
+  #########################################################################
+  # TOC Plugin
+  #########################################################################
 
-      @children.each do |child|
-        child.pp counter, string
+  module Toc
+
+
+    #======================================================================
+    # Path Tree
+    #======================================================================
+
+    class TreeNode
+      attr_accessor :name, :data, :children, :html_string
+
+      def initialize(name, data, children = [])
+        @name = name
+        @data = data
+        @children = children
+
+        @pp_indentation_width = 2
+        @html_string = []
       end
 
-      counter -= 1
-    end
+      def pp(counter, string)
+        string << ' ' * (counter * @pp_indentation_width) +
+          File.basename(@name) + "\n"
+        counter += 1
 
-    def html(children_only=false)
-      children_empty_states = @children.collect { |c| c.children.empty? }
-      is_flat = !children_empty_states.select { |c| c == true}.empty?
-
-      html = []
-      if !@children.empty? && is_flat
-        # Completely flat lists
-        html << '<ul>'
-        @children.each do |c|
-          html << "<li><a href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+        @children.each do |child|
+          child.pp counter, string
         end
-        html << '</ul>'
-        html.join("\n")
-      else
-        # Arbitrarily deeply nested lists
-        if children_only
-          @children.each { |child| html << child.htmlize([]) }
+
+        counter -= 1
+      end
+
+      def html(children_only=false)
+        children_empty_states = @children.collect { |c| c.children.empty? }
+        is_flat = !children_empty_states.select { |c| c == true}.empty?
+
+        html = []
+        if !@children.empty? && is_flat
+          # Completely flat lists
+          html << '<ul>'
+          @children.each do |c|
+            html <<
+              "<li><a href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+          end
+          html << '</ul>'
           html.join("\n")
         else
-          self.htmlize([]).join("\n")
-        end
-      end
-    end
-
-    def htmlize(html, previous_children_empty=nil)
-      # Leaf nodes should not be lists themselves
-      if !@children.empty?
-        html << '<ul>'
-      end
-
-      if previous_children_empty != true && @children.empty? &&
-          Tree.current_children_empty != true
-        html << '<ul>'
-      end
-
-      html << "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
-
-      # The semi-global state (storing something on the `Tree' class) is
-      # necessary since `@children.empty?' within the `@children.each''s
-      # block would not work since it could not access the outer scope
-      # correctly.
-      Tree.current_children_empty = @children.empty?  # Semi-global state!
-
-      @children.each do |child|
-        child.htmlize html, Tree.current_children_empty
-      end
-
-      # Leaf nodes should not be lists themselves
-      if !@children.empty?
-        html << '</ul>'
-      end
-
-      if previous_children_empty != true && !@children.empty? &&
-          !Tree.current_children_empty != true
-        html << '</ul>'
-      end
-
-      html
-    end
-
-  end
-
-
-  class Tree
-    attr_accessor :root
-
-    def initialize(root)
-      @root = root
-      @last_found_node = nil  # Semi-global state!
-      # Note: Do not use the following variable anywhere else than in
-      # `TreeNode::htmlize' since it is essentially semi-global state.
-      # If you rebell still do it, at least update this comment!
-      @current_children_empty  # Semi-global state!
-    end
-
-    def Tree::current_children_empty
-      @current_children_empty
-    end
-
-    def Tree::current_children_empty=(value)
-      @current_children_empty = value
-    end
-
-    def find(node_name, node, is_node=false)
-      # Special case: the searched node is one of the children of the root
-      # note.
-      if is_node
-        if node.children.collect { |c| c.name }.include? node_name
-          @last_found_node = node.children[0]
+          # Arbitrarily deeply nested lists
+          if children_only
+            @children.each { |child| html << child.htmlize([]) }
+            html.join("\n")
+          else
+            self.htmlize([]).join("\n")
+          end
         end
       end
 
-      node.children.each do |child|
-        children = child.children.select { |n| n.name == node_name }
-
-        if (!children.collect { |n| n.name }.include? node_name)
-          self.find node_name, child
-        else
-          @last_found_node = children[0]  # Semi-global state!
+      def htmlize(html, previous_children_empty=nil)
+        # Leaf nodes should not be lists themselves
+        if !@children.empty?
+          html << '<ul>'
         end
 
-      end
-      return @last_found_node
-    end
-
-    def find_parent(node_name, node=@root, parent_node=nil)
-      node.children.each do |child|
-        if !(child.name == node_name)
-          self.find_parent(node_name, child, child)
-        else
-          @last_found_node = parent_node
-        end
-      end
-      return @last_found_node
-    end
-
-    def insert_child(node_name, new_node, node=@root)
-      node.children.each do |child|
-        if child.name == node_name
-          child.children << new_node
-        else
-          self.insert_child node_name, new_node, child
+        if previous_children_empty != true && @children.empty? &&
+            Tree.current_children_empty != true
+          html << '<ul>'
         end
 
+        html << "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
+
+        # Semi-global state!
+        #
+        # The semi-global state (storing something on the `Tree' class) is
+        # necessary since `@children.empty?' within the `@children.each''s
+        # block would not work since it could not access the outer scope
+        # correctly.
+        Tree.current_children_empty = @children.empty?
+
+        @children.each do |child|
+          child.htmlize html, Tree.current_children_empty
+        end
+
+        # Leaf nodes should not be lists themselves
+        if !@children.empty?
+          html << '</ul>'
+        end
+
+        if previous_children_empty != true && !@children.empty? &&
+            !Tree.current_children_empty != true
+          html << '</ul>'
+        end
+
+        html
       end
+
     end
 
-    def insert_pathes(pathes)
-      pathes.each_pair do |key, value|
-        value.each_pair do |k, v|
-          if File.basename(k) != 'index.html'
-            self.insert_child(key, TreeNode.new(k, ['data']))
+
+    class Tree
+      attr_accessor :root
+
+      def initialize(root)
+        @root = root
+        @last_found_node = nil  # Semi-global state!
+        # Note: Do not use the following variable anywhere else than in
+        # `TreeNode::htmlize' since it is essentially semi-global state.
+        # If you rebell still do it, at least update this comment!
+        @current_children_empty  # Semi-global state!
+      end
+
+      def Tree::current_children_empty
+        @current_children_empty
+      end
+
+      def Tree::current_children_empty=(value)
+        @current_children_empty = value
+      end
+
+      def find(node_name, node, is_node=false)
+        # Special case: the searched node is one of the children of the
+        # root note.
+        if is_node
+          if node.children.collect { |c| c.name }.include? node_name
+            @last_found_node = node.children[0]
           end
         end
 
-        self.insert_pathes value
+        node.children.each do |child|
+          children = child.children.select { |n| n.name == node_name }
+
+          if (!children.collect { |n| n.name }.include? node_name)
+            self.find node_name, child
+          else
+            @last_found_node = children[0]  # Semi-global state!
+          end
+
+        end
+        return @last_found_node
       end
-    end
 
-    def pp
-      counter = 0
-      string = []
-      @root.pp counter, string
-      string.join
-    end
+      def find_parent(node_name, node=@root, parent_node=nil)
+        node.children.each do |child|
+          if !(child.name == node_name)
+            self.find_parent(node_name, child, child)
+          else
+            @last_found_node = parent_node
+          end
+        end
+        return @last_found_node
+      end
 
-    def html
-      @root.htmlize @root.html_string
-      @root.html_string.join "\n"
-    end
+      def insert_child(node_name, new_node, node=@root)
+        node.children.each do |child|
+          if child.name == node_name
+            child.children << new_node
+          else
+            self.insert_child node_name, new_node, child
+          end
 
-  end
+        end
+      end
 
+      def insert_pathes(pathes)
+        pathes.each_pair do |key, value|
+          value.each_pair do |k, v|
+            if File.basename(k) != 'index.html'
+              self.insert_child(key, TreeNode.new(k, ['data']))
+            end
+          end
 
-  #========================================================================
-  # Actual Plugin
-  #========================================================================
+          self.insert_pathes value
+        end
+      end
 
-  class Generator < Jekyll::Generator
-
-    def initialize(arg)
-      super
-      @tree = {}
-      @nested_list = ''
-      @top_level_dir_name = '/pages'
-    end
-
-    def generate_tree(pathes)
-      pathes.each do |path|
-        current = @tree
+      def pp
         counter = 0
+        string = []
+        @root.pp counter, string
+        string.join
+      end
 
-        path.split("/").inject("") do |sub_path, dir|
-          sub_path = File.join(sub_path, dir)
+      def html
+        @root.htmlize @root.html_string
+        @root.html_string.join "\n"
+      end
 
-          if (current[sub_path] == nil || current[sub_path] == false) &&
-              sub_path != 'index.html'
-            current[sub_path] = { }
+    end
+
+
+    #======================================================================
+    # Actual Plugin
+    #======================================================================
+
+    class IndexPage < Page
+      def initialize(site, base, dir, name, data, top_level_dir_name)
+        @site = site
+        @base = base
+        @dir = dir
+        @name = name
+
+        self.process(@name)
+        self.read_yaml(File.join(base,
+                                 File.join(top_level_dir_name,
+                                           '_fallback')), 'index.html')
+        data.each_pair { |key, value| self.data[key] = value }
+      end
+
+    end
+
+
+    class Generator < Jekyll::Generator
+      priority :low
+
+      def initialize(arg)
+        super
+        @tree = {}
+        @nested_list = ''
+        @top_level_dir_name = '/pages'
+      end
+
+      def generate_index_pages(site, pathes, path_tree, toc)
+        pathes.each_pair do |key, value|
+          value.each_pair do |k, v|
+            referrer_path = path_tree.find_parent(k).name
+            if File.basename(k) != 'index.html'
+              if !File.file?(File.join(site.source,
+                                       File.join(k, 'index.html')))
+                index_page =
+                  IndexPage.new(site, site.source,
+                                '/',
+                                'index.html', {
+                                  'referrer' => referrer_path,
+                                  'referrer_name' =>
+                                  File.basename(referrer_path),
+                                  'doctoc' => toc
+                                },
+                                @top_level_dir_name)
+
+                index_page.render(site.layouts, site.site_payload)
+                # index_page.write(site.dest)
+                index_page.write(File.join(site.dest, k))
+                site.pages << index_page
+
+                # This may become a future feature.
+                #
+                # Generate actual source files in `pages'; required rerun
+                # of Jekyll afterwards to force it to actually compile
+                # those source files into `_site'.`
+                # File.open(File.join(site.source,
+                #                     File.join('',
+                #                               File.join(k, 'index.html'))),
+                #           'w') do |f|
+                #   f.write '<p>Automatically generated page</p>'
+                # end
+              end
+            end
           end
 
-          current = current[sub_path]
-
-          sub_path
+          self.generate_index_pages(site, value, path_tree, toc)
         end
       end
-    end
 
-    def generate(site)
-      page_pathes = site.pages.each.collect { |page| page.path }
+      def generate_tree(pathes)
+        pathes.each do |path|
+          current = @tree
+          counter = 0
 
-      generate_tree(page_pathes)
+          path.split("/").inject("") do |sub_path, dir|
+            sub_path = File.join(sub_path, dir)
 
-      path_tree = Tree.new(TreeNode.new('root', ['data'],
-                                        [TreeNode.new(@top_level_dir_name,
-                                                      ['data'])]))
+            if (current[sub_path] == nil || current[sub_path] == false) &&
+                sub_path != 'index.html'
+              current[sub_path] = { }
+            end
 
-      path_tree.insert_pathes({@top_level_dir_name =>
-                                @tree[@top_level_dir_name] })
+            current = current[sub_path]
 
-      # TOC for the whole site
-
-      toc = ''
-      # Exclude the top level node since displaying `root' on the site
-      # by default makes no sense. If necessary, this can still be achieved
-      # by the user by wrapping the Liquid TOC tag in a HTML list tag.
-      path_tree.find(@top_level_dir_name,
-                     path_tree.root, true).children.each do |child|
-        toc += child.html
-      end
-      site.pages.each do |page|
-        page.data['doctoc'] = toc
+            sub_path
+          end
+        end
       end
 
-      # Attach the TOC to the site object so that it can be used elsewhere
-      site.data[:toc_tree] = path_tree
+      def generate(site)
+        page_pathes = site.pages.each.collect { |page| page.path }
+
+        generate_tree(page_pathes)
+
+        path_tree =
+          Tree.new(TreeNode.new('root', ['data'],
+                                [TreeNode.new(@top_level_dir_name,
+                                              ['data'])]))
+
+        path_tree.insert_pathes({@top_level_dir_name =>
+                                  @tree[@top_level_dir_name] })
+
+        # TOC for the whole site
+
+        toc = ''
+        # Exclude the top level node since displaying `root' on the site
+        # by default makes no sense. If necessary, this can still be
+        # achieved by the user by wrapping the Liquid TOC tag in a HTML
+        # list tag.
+        path_tree.find(@top_level_dir_name,
+                       path_tree.root, true).children.each do |child|
+          toc += child.html
+        end
+        site.pages.each do |page|
+          page.data['doctoc'] = toc
+        end
+
+        # Attach the TOC to the site object so that it can be used
+        # elsewhere
+        site.data[:toc_tree] = path_tree
+
+        # Generate the index pages
+        self.generate_index_pages site, @tree, path_tree, toc
+      end
     end
+
   end
-
-end
-
-
-
-module Jekyll
 
 
   #########################################################################
@@ -322,13 +405,6 @@ module Jekyll
         # list tag.
         html += toc.html true
 
-        # top_level_nodes = []
-        # # toc.children.each do |child|
-        # #   top_level_nodes << child.name
-        # # end
-        # top_level_nodes << toc.name
-        # context.registers[:site].data['top_level_nodes'] = top_level_nodes
-
       end
       html
     end
@@ -353,7 +429,9 @@ module Jekyll
       toc_tree = context.registers[:site].data[:toc_tree]
       toc = toc_tree.
         find_parent('/' + File.dirname(context.registers[:page]['path']))
-      
+
+      # Exclude any top level nodes (usually there should only be one)
+      # since they do not have a node associated with them.
       if toc_tree.root.children.collect { |c| c.name }.include? toc.name
         html = ''
       else
@@ -373,7 +451,9 @@ module Jekyll
 
   end
 
-end
 
-Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
-Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
+  # Register the Liquid tags
+  Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
+  Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
+
+end
