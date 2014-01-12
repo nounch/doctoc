@@ -1,5 +1,15 @@
 require 'pp'
 
+##########################################################################
+# DISCLAIMER
+##########################################################################
+#
+# Major flaws in this code:
+# - Duplication
+# - if-hell
+# - (Semi-)Global state
+# - Hard coupling
+
 module Jekyll
 
   # XXX: This is a workaround necessary to prevent Jekyll from eagerly
@@ -55,11 +65,24 @@ module Jekyll
       end
 
       def html(options)
-        options = { :children_only => false}.merge(options)
+        # The very existence of `TreeNode::html' duplicates a lot of
+        # `TreeNode::htmlize' code. This is a shortcoming and completely
+        # bad design. Why does it exist then? It really helps when treating
+        # leaf node lists differently (non-wrapped individual `li'
+        # elements).
+
+        options = { :children_only => false, :add_class =>
+          [nil, ''] }.merge(options)
+
+        class_target = options[:add_class][0]
+        if class_target != nil && class_target == @name
+          class_attr = "class=\"#{options[:add_class][1]}\" "
+        else
+          class_attr = ''
+        end
 
         children_empty_states = @children.collect { |c| c.children.empty? }
         is_flat = !children_empty_states.select { |c| c == true}.empty?
-
 
         html = []
         if !@children.empty? && is_flat
@@ -68,7 +91,8 @@ module Jekyll
           @children.each do |c|
 
             html <<
-              "<li><a href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+              "<li><a\
+ #{class_attr}href=\"#{c.name}\">#{File.basename c.name}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -76,16 +100,26 @@ module Jekyll
           # Arbitrarily deeply nested lists
           if options[:children_only]
             @children.each { |child| html <<
-              child.htmlize([], :previous_children_empty => nil) }
+              child.htmlize([], :previous_children_empty => nil,
+                            :add_class => options[:add_class]) }
             html.join("\n")
           else
-            self.htmlize([], {}).join("\n")
+            self.htmlize([], :previous_children_empty => nil,
+                         :add_class => options[:add_class]).join("\n")
           end
         end
       end
 
       def htmlize(html, options)
-        options = { :previous_children_empty => nil }.merge(options)
+        options = { :previous_children_empty => nil, :add_class =>
+          [nil, ''] }.merge(options)
+
+        class_target = options[:add_class][0]
+        if class_target != nil && class_target == @name
+          class_attr = "class=\"#{options[:add_class][1]}\" "
+        else
+          class_attr = ''
+        end
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
@@ -97,9 +131,9 @@ module Jekyll
           html << '<ul>'
         end
 
-
         html <<
-          "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
+          "<li><a\
+ #{class_attr}href=\"#{@name}\">#{File.basename @name}</a></li>"
 
         # Semi-global state!
         #
@@ -111,7 +145,7 @@ module Jekyll
 
         @children.each do |child|
           child.htmlize html, :previous_children_empty =>
-            Tree.current_children_empty
+            Tree.current_children_empty, :add_class => options[:add_class]
         end
 
         # Leaf nodes should not be lists themselves
@@ -214,8 +248,11 @@ module Jekyll
         string.join
       end
 
-      def html
-        @root.htmlize @root.html_string, :previous_children_empty => nil
+      def html(options)
+        options = { :previous_children_empty => nil, :add_class =>
+          [nil, ''] }.merge(options)
+
+        @root.htmlize @root.html_string, options
         @root.html_string.join "\n"
       end
 
@@ -369,8 +406,12 @@ module Jekyll
         end
 
         # Attach the TOC to the site object so that it can be used
-        # elsewhere
+        # elsewhere.
         site.data[:toc_tree] = path_tree
+
+        # Attach the name of the top level directory to the site so that
+        # tags can use it.
+        site.data[:doctoc_top_level_dir_name] = @top_level_dir_name
 
         # Generate the index pages
         self.generate_index_pages site, @tree, path_tree, toc
@@ -391,6 +432,10 @@ module Jekyll
       @text = text
       # Special marker for parent links
       @parent_node_marker = 'parent-node'
+      @highlight_current_node_marker = 'highlight-current-node'
+
+      # Default CSS highlighting class
+      @doctoc_highlight_class = 'doctoc-highlight'
     end
 
     def render(context)
@@ -411,7 +456,6 @@ module Jekyll
       # In case there is no TOC node found or the TOC node that has been
       # found is a leaf node there should not be any HTML emitted.
       if toc == nil || toc.children.empty?
-        html = ''
         if !@text.empty?
 
           # Link to the parent node when on a leaf node page
@@ -430,7 +474,9 @@ module Jekyll
             html += "<a href=\"#{path}\">#{link_text}</p>"
 
           else
-            html += @text
+            if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
+              html += @text
+            end
           end
 
         end
@@ -439,9 +485,37 @@ module Jekyll
         # site by default makes no sense. If necessary, this can still be
         # achieved by the user by wrapping the Liquid TOC tag in a HTML
         # list tag.
-        html += toc.html :children_only => true
+        if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
+          html += toc.html :children_only => true
+        end
 
       end
+
+      # Check for additional text supplied to the tag.
+      if !@text.empty?
+        # Highlight the current node
+        if @text =~ / *#{Regexp.quote(@highlight_current_node_marker)} */
+          highlight_class = ''
+
+          if @text =~
+              /^ *#{Regexp.quote(@highlight_current_node_marker)} *$/
+            highlight_class = @doctoc_highlight_class
+          else
+            highlight_class =
+              @text.gsub(/^ *#{Regexp.quote(@highlight_current_node_marker)} *, */, '')
+          end
+
+          # Attach the necessary children only, leaving out the top level
+          # nodes.
+          toc_tree.find(context.registers[:site].data[:doctoc_top_level_dir_name],
+                        toc_tree.root, true).children.each do |child|
+            html += child.html :children_only => false, :add_class =>
+              [toc.name, highlight_class]
+          end
+
+        end
+      end
+
       html
     end
 
@@ -644,6 +718,7 @@ module Jekyll
     end
 
   end
+
 
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
