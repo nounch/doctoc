@@ -54,15 +54,19 @@ module Jekyll
         counter -= 1
       end
 
-      def html(children_only=false)
+      def html(options)
+        options = { :children_only => false}.merge(options)
+
         children_empty_states = @children.collect { |c| c.children.empty? }
         is_flat = !children_empty_states.select { |c| c == true}.empty?
+
 
         html = []
         if !@children.empty? && is_flat
           # Completely flat lists
           html << '<ul>'
           @children.each do |c|
+
             html <<
               "<li><a href=\"#{c.name}\">#{File.basename c.name}</a></li>"
           end
@@ -70,27 +74,32 @@ module Jekyll
           html.join("\n")
         else
           # Arbitrarily deeply nested lists
-          if children_only
-            @children.each { |child| html << child.htmlize([]) }
+          if options[:children_only]
+            @children.each { |child| html <<
+              child.htmlize([], :previous_children_empty => nil) }
             html.join("\n")
           else
-            self.htmlize([]).join("\n")
+            self.htmlize([], {}).join("\n")
           end
         end
       end
 
-      def htmlize(html, previous_children_empty=nil)
+      def htmlize(html, options)
+        options = { :previous_children_empty => nil }.merge(options)
+
         # Leaf nodes should not be lists themselves
         if !@children.empty?
           html << '<ul>'
         end
 
-        if previous_children_empty != true && @children.empty? &&
+        if options[:previous_children_empty] != true && @children.empty? &&
             Tree.current_children_empty != true
           html << '<ul>'
         end
 
-        html << "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
+
+        html <<
+          "<li><a href=\"#{@name}\">#{File.basename @name}</a></li>"
 
         # Semi-global state!
         #
@@ -101,7 +110,8 @@ module Jekyll
         Tree.current_children_empty = @children.empty?
 
         @children.each do |child|
-          child.htmlize html, Tree.current_children_empty
+          child.htmlize html, :previous_children_empty =>
+            Tree.current_children_empty
         end
 
         # Leaf nodes should not be lists themselves
@@ -109,7 +119,8 @@ module Jekyll
           html << '</ul>'
         end
 
-        if previous_children_empty != true && !@children.empty? &&
+        if options[:previous_children_empty] != true &&
+            !@children.empty? &&
             !Tree.current_children_empty != true
           html << '</ul>'
         end
@@ -204,7 +215,7 @@ module Jekyll
       end
 
       def html
-        @root.htmlize @root.html_string
+        @root.htmlize @root.html_string, :previous_children_empty => nil
         @root.html_string.join "\n"
       end
 
@@ -233,6 +244,7 @@ module Jekyll
 
 
     class Generator < Jekyll::Generator
+      safe true
       priority :low
 
       def initialize(arg)
@@ -293,7 +305,9 @@ module Jekyll
 
       def generate_prev_next_list(pathes)
         pathes.each_pair do |key, value|
-          @prev_next_list << key if File.basename(key) != 'index.html'
+          if key != @top_level_dir_name
+            @prev_next_list << key if File.basename(key) != 'index.html'
+          end
           self.generate_prev_next_list value
         end
       end
@@ -305,6 +319,7 @@ module Jekyll
 
           path.split("/").inject("") do |sub_path, dir|
             sub_path = File.join(sub_path, dir)
+            sub_path = sub_path.gsub(/_/, ' ')
 
             if (current[sub_path] == nil || current[sub_path] == false) &&
                 sub_path != 'index.html'
@@ -340,12 +355,12 @@ module Jekyll
         # list tag.
         path_tree.find(@top_level_dir_name,
                        path_tree.root, true).children.each do |child|
-          toc += child.html
+          toc += child.html :children_only => false
         end
 
         # Generate `previous'/`next' link references
         self.generate_prev_next_list @tree
-        @prev_next_list = @prev_next_list[1..-1]
+        # @prev_next_list = @prev_next_list[1..-1]
 
         # Add shared data to each page
         site.pages.each do |page|
@@ -424,7 +439,7 @@ module Jekyll
         # site by default makes no sense. If necessary, this can still be
         # achieved by the user by wrapping the Liquid TOC tag in a HTML
         # list tag.
-        html += toc.html true
+        html += toc.html :children_only => true
 
       end
       html
@@ -502,7 +517,10 @@ module Jekyll
     def render(context)
       html = ''
 
-      path = File.dirname(File.join('/', context.registers[:page]['path']))
+      path =
+        File.dirname(File.join('/',
+                               context.registers[:page]['path'])).gsub(/_/,
+                                                                       ' ')
       prev_next_list = context.registers[:page]['doctoc_prev_next_list']
 
       index = nil
@@ -570,7 +588,10 @@ module Jekyll
     def render(context)
       html = ''
 
-      path = File.dirname(File.join('/', context.registers[:page]['path']))
+      path =
+        File.dirname(File.join('/',
+                               context.registers[:page]['path'])).gsub(/_/,
+                                                                       ' ')
       prev_next_list = context.registers[:page]['doctoc_prev_next_list']
 
       index = nil
