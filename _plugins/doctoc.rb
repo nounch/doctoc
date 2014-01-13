@@ -1,5 +1,3 @@
-require 'pp'
-
 ##########################################################################
 # DISCLAIMER
 ##########################################################################
@@ -9,6 +7,18 @@ require 'pp'
 # - if-hell
 # - (Semi-)Global state
 # - Hard coupling
+#
+# Specifics:
+# - bulky ifs and RegEx matching in Tag classes
+# - messy argument hash handling in methods (`options')
+# - The `Tree' class is not a 100% clean top-level entry point for its
+#   `TreeNode's.
+# - The `TreeNode' HTML rendering is messy.
+# - Tag classes duplicate a lot of code among themselves (i.e. a
+#   `previous' and a `next' tag have to do a lot of similar work).
+#    Probably this is also a shortcoming of the Jekyll plugin API.
+# - Both, `Tree' and `Generator' have a `@top_level_dir' vairable. Only
+#   `Tree' shouldd have one.
 
 module Jekyll
 
@@ -50,6 +60,26 @@ module Jekyll
 
         @pp_indentation_width = 2
         @html_string = []
+      end
+
+      def sort_children_lexically(options)
+        options = { :reverse => false }.merge(options)
+
+        @children = @children.sort do |x, y|
+          File.basename(x.name).casecmp File.basename(y.name)
+        end
+
+        @children = @children.reverse! if options[:reverse]
+      end
+
+      def sort_children_by_string_length(options)
+        options = { :reverse => false }.merge(options)
+
+        @children = @children.sort do |x, y|
+          File.basename(x.name).length <=> File.basename(y.name).length
+        end
+
+        @children = @children.reverse! if options[:reverse]
       end
 
       def pp(counter, string)
@@ -166,7 +196,7 @@ module Jekyll
 
 
     class Tree
-      attr_accessor :root
+      attr_accessor :root, :prev_next_list
 
       def initialize(root)
         @root = root
@@ -175,6 +205,8 @@ module Jekyll
         # `TreeNode::htmlize' since it is essentially semi-global state.
         # If you rebell still do it, at least update this comment!
         @current_children_empty  # Semi-global state!
+        @prev_next_list = []
+        @top_level_dir_name = '/pages'
       end
 
       def Tree::current_children_empty
@@ -184,6 +216,52 @@ module Jekyll
       def Tree::current_children_empty=(value)
         @current_children_empty = value
       end
+
+      def generate_prev_next_list(options)
+        options = { :node => @root }.merge(options)
+        @prev_next_list = []
+        self.do_generate_prev_next_list :node => options[:node]
+      end
+
+      def do_generate_prev_next_list(options)
+        options = { :node => @root }.merge(options)
+        name = options[:node].name
+        if name != @top_level_dir_name
+          @prev_next_list << name if File.basename(name) != 'index.html'
+        end
+        options[:node].children.each do |child|
+          self.do_generate_prev_next_list :node => child
+        end
+      end
+
+      def sort(options)
+        options = { :node => @root, :order =>
+          'lexical', :reverse => false }.merge(options)
+
+        options[:node].children.each do |child|
+          if options[:order] == 'lexical'
+            child.sort_children_lexically :reverse => options[:reverse]
+          elsif options[:order] == 'string_length'
+            child.sort_children_by_string_length :reverse =>
+              options[:reverse]
+          else
+            child.sort_children_lexically :reverse => options[:reverse]
+          end
+          self.sort :node => child, :reverse =>
+            options[:reverse], :order => options[:order]
+        end
+
+        # (Re-)Generate the previous/next list for this tree.
+        self.generate_prev_next_list :node => self.find('/pages',
+                                                        self.root, true)
+      end
+
+      # def sort(options)
+      #   options = { :node => @root, :order =>
+      #     'lexical', :reverse => false }.merge(options)
+      #   @root.sort :node => options[:node], :order => options[:order],
+      #   :reverse => options[:reverse]
+      # end
 
       def find(node_name, node, is_node=false)
         # Special case: the searched node is one of the children of the
@@ -227,6 +305,10 @@ module Jekyll
           end
 
         end
+
+        # (Re-)Generate the previous/next list for this tree.
+        self.generate_prev_next_list :node => self.find('/pages',
+                                                        self.root, true)
       end
 
       def insert_pathes(pathes)
@@ -340,14 +422,14 @@ module Jekyll
         end
       end
 
-      def generate_prev_next_list(pathes)
-        pathes.each_pair do |key, value|
-          if key != @top_level_dir_name
-            @prev_next_list << key if File.basename(key) != 'index.html'
-          end
-          self.generate_prev_next_list value
-        end
-      end
+      # def generate_prev_next_list(pathes)
+      #   pathes.each_pair do |key, value|
+      #     if key != @top_level_dir_name
+      #       @prev_next_list << key if File.basename(key) != 'index.html'
+      #     end
+      #     self.generate_prev_next_list value
+      #   end
+      # end
 
       def generate_tree(pathes)
         pathes.each do |path|
@@ -375,15 +457,26 @@ module Jekyll
 
         generate_tree(page_pathes)
 
+        # The version of `path_tree' that is attached to the `site' object
+        # is called `toc_tree' to indicate that those two versions of the
+        # same tree object can differ at times.
+        #
+        # Example:
+        #   1. `path_tree' is created
+        #   2. `path_tree' is modified
+        #   3. `path_tree' gets attached to `site' as `toc_tree'
+        #
+        #   Between 3. and 1. there may be differences caused by 2.
         path_tree =
           Tree.new(TreeNode.new('root', ['data'],
                                 [TreeNode.new(@top_level_dir_name,
                                               ['data'])]))
 
-        path_tree.insert_pathes({@top_level_dir_name =>
+        path_tree.insert_pathes({ @top_level_dir_name =>
                                   @tree[@top_level_dir_name] })
 
-        # TOC for the whole site
+        path_tree.sort :node => path_tree.root, :order =>
+          'lexical', :reverse => false
 
         toc = ''
         # Exclude the top level node since displaying `root' on the site
@@ -396,13 +489,16 @@ module Jekyll
         end
 
         # Generate `previous'/`next' link references
-        self.generate_prev_next_list @tree
-        # @prev_next_list = @prev_next_list[1..-1]
+        # self.generate_prev_next_list @tree
+        # self.generate_prev_next_list :node =>
+        #   path_tree.find('/pages', path_tree.root, true)
+
+        # puts '--------------------'
+        # pp path_tree.prev_next_list
 
         # Add shared data to each page
         site.pages.each do |page|
           page.data['doctoc'] = toc
-          page.data['doctoc_prev_next_list'] = @prev_next_list
         end
 
         # Attach the TOC to the site object so that it can be used
@@ -595,7 +691,8 @@ module Jekyll
         File.dirname(File.join('/',
                                context.registers[:page]['path'])).gsub(/_/,
                                                                        ' ')
-      prev_next_list = context.registers[:page]['doctoc_prev_next_list']
+      prev_next_list =
+        context.registers[:site].data[:toc_tree].prev_next_list
 
       index = nil
       if prev_next_list != nil
@@ -666,7 +763,8 @@ module Jekyll
         File.dirname(File.join('/',
                                context.registers[:page]['path'])).gsub(/_/,
                                                                        ' ')
-      prev_next_list = context.registers[:page]['doctoc_prev_next_list']
+      prev_next_list =
+        context.registers[:site].data[:toc_tree].prev_next_list
 
       index = nil
       if prev_next_list != nil
@@ -720,10 +818,85 @@ module Jekyll
   end
 
 
+  #########################################################################
+  # `doctoc_sort' Tag
+  #########################################################################
+
+  class DocTocSortTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+
+      # Markers
+      @lexical_sort_marker = 'lexical'
+      @string_length_sort_marker = 'string_length'
+    end
+
+    def render(context)
+      html = ''
+      sort_order = 'lexical'
+      reverse = false
+      reverse_marker = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+
+      # Sort the site-wide TOC tree
+      context.registers[:site].data[:toc_tree].sort :node =>
+        toc_tree.root, :order => 'lexical', :reverse => true
+
+      # toc_tree.sort :node => toc_tree.root, :order =>
+      #   'lexical', :reverse => true
+
+      if !@text.empty?
+
+        # Sort order: lexical
+        if @text =~ /^ *#{Regexp.quote(@lexical_sort_marker)} *$/
+          sort_order = 'lexical'
+        elsif @text =~ /^ *#{Regexp.quote(@lexical_sort_marker)} *,/
+          sort_order = 'lexical'
+          # Reverse sort order
+          reverse_marker =
+            @text.gsub(/^ *#{Regexp.quote(@lexical_sort_marker)} *,/,
+                       '').strip
+        end
+
+        # Sort order: string length
+        if @text =~ /^ *#{Regexp.quote(@string_length_sort_marker)} *$/
+          sort_order = 'string_length'
+        elsif @text =~ /^ *#{Regexp.quote(@string_length_sort_marker)} *,/
+          sort_order = 'string_length'
+          # Reverse sort order
+          reverse_marker =
+            @text.gsub(/^ *#{Regexp.quote(@string_length_sort_marker)} *,/,
+                       '').strip
+        end
+
+      end
+
+      if reverse_marker == 'reverse'
+        reverse = true
+      else
+        reverse = false
+      end
+
+      toc_tree.sort :node => toc_tree.root, :order =>
+        sort_order, :reverse => reverse
+
+      toc = toc_tree.find('/' +
+                          File.dirname(context.registers[:page]['path']),
+                          toc_tree.root, true)
+      # html += toc.html :children_only => true
+      ''
+    end
+
+  end
+
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
   Liquid::Template.register_tag('doctoc_prev', Jekyll::DocTocPreviousTag)
   Liquid::Template.register_tag('doctoc_next', Jekyll::DocTocNextTag)
+  Liquid::Template.register_tag('doctoc_sort', Jekyll::DocTocSortTag)
 
 end

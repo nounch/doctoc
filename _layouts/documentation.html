@@ -8,7 +8,6 @@
   </head>
 
   <body>
-a
 
     <style type="text/css" media="screen">
       .doctoc-highlight {
@@ -22,6 +21,8 @@ a
       }
     </style>
 
+    {% doctoc_sort lexical, reverse %}
+
     <div class="row">
       <div class="row">
         <div class="columns large-12">
@@ -33,7 +34,8 @@ a
       <div class="row">
         <div class="columns large-3">
           <div class="panel">
-            {{ page.doctoc }}
+            <!-- {#{ page.doctoc }} -->
+	    {% doctoc highlight-current-node, my-custom-highlight %}
           </div>
         </div>
         <div class="columns large-6">
@@ -105,8 +107,8 @@ a
             <!-- {% doctoc <em style="color: #FF0000;">OVERVIEW</em>%} -->
             {% doctoc parent-node, Parent node %}
 	    <hr />
-            <!-- {% doctoc highlight-current-node, my-custom-highlight %} -->
-            {% doctoc highlight-current-node %}
+            {% doctoc highlight-current-node, my-custom-highlight %}
+            <!-- {% doctoc highlight-current-node %} -->
           </div>
         </div>
       </div>
