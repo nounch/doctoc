@@ -84,16 +84,23 @@ module Jekyll
         @children = @children.reverse! if options[:reverse]
       end
 
-      def sort_children_by_custom_list(options)
-        options = { :reverse => false, :sort_array => [] }.merge(options)
+      def pp_child_list(child_list)
+        child_list.collect { |c| c.name }
+      end
 
-        @children.each_with_index do |child, i|
-          options[:sort_array].reverse.each do |string|
+      def sort_children_by_custom_list(options)
+        options = { :reverse => false, :sort_arrays => {}, :level =>
+          nil }.merge(options)
+
+        array = []
+        all_array = options[:sort_arrays]['all']
+        array.push(*all_array) if all_array != nil
+        level_array = options[:sort_arrays][options[:level]]
+        array.push(*level_array) if level_array != nil
+
+        array.reverse.each do |string|
+          @children.each_with_index do |child, i|
             if File.basename(child.name) == string
-              # if string == 'bright' || string == 'dark'
-              # if string == 'colors'
-              #   puts "child: #{child.children.collect { |c| c.name }}"
-              # end
               @children.insert(0, @children.delete_at(i))
             end
           end
@@ -246,7 +253,10 @@ module Jekyll
     class Tree
       attr_accessor :root, :prev_next_list
 
-      def initialize(root)
+      def initialize(root, options)
+        options = { :site => nil }.merge(options)
+
+        @site = options[:site]
         @root = root
         @last_found_node = nil  # Semi-global state!
         # Note: Do not use the following variable anywhere else than in
@@ -255,24 +265,53 @@ module Jekyll
         @current_children_empty  # Semi-global state!
         @prev_next_list = []
         @top_level_dir_name = '/pages'
-        @custom_sort_array =
-          [
-           'colors',
-           'animals',
 
-           'orange',
-           'red',
-           'yellow',
+        # Custom sorting-related config
+        @custom_sorting_config_file =
+          File.join(File.join(@site.source,
+                              File.join(@top_level_dir_name,
+                                        '_config')), 'sorting.yml')
+        @custom_sort_yaml_template = <<-eos
+---
+#==========================================================================
+# Each key refers to an indentation level; e.g. `1' is the top level, `2'
+# is the second indentation level, `3' the third one etc.
+#==========================================================================
 
-           'CDE Truck',
-           'ABC Truck',
+# Top level
+1:
+  - colors
+  - animals
 
-           'blue',
-           'purple',
+# Second level of indentation
+2:
+  - dark
+  - bright
 
-           'dark',
-           'bright',
-          ]
+  - more nonsense
+  - nonsense
+
+# Third level of indentation
+3:
+  - orange
+  - yellow
+  - red
+
+  - CDE Truck
+  - ABC Truck
+
+  - blue
+  - purple
+
+#==========================================================================
+# The `all' section includes a sorting order which should be applied
+# throughout all indentation levels.
+#==========================================================================
+all:
+  - FGH Truck
+  - IJK Truck
+eos
+        @custom_sort_array = self.generate_custom_sort_array
       end
 
       def Tree::current_children_empty
@@ -281,6 +320,36 @@ module Jekyll
 
       def Tree::current_children_empty=(value)
         @current_children_empty = value
+      end
+
+      def generate_custom_sort_array
+        # Create the config directory if it does not exist yet
+        dirname = File.join(File.join(@site.source,
+                                      File.join(@top_level_dir_name,
+                                                '_config')))
+        Dir.mkdir(dirname) unless Dir.exists?(dirname)
+
+        # Create the sorting config file if it does not exist yet
+        file = File.join(File.join(@site.source,
+                                   File.join(@top_level_dir_name,
+                                             '_config')), 'sorting.yml')
+        File.open(file, 'w') do |f|
+          f.write @custom_sort_yaml_template
+        end if !File.exists? file
+
+        # Load the config data from the config file.
+        config_data = {}
+        if File.file? @custom_sorting_config_file
+          config_data = YAML.load_file @custom_sorting_config_file
+
+          # Provide an empty hash in case there were issues when loading
+          # the config data.
+          if config_data == false || config_data == nil
+            config_data = {}
+          end
+        end
+
+        config_data
       end
 
       def generate_prev_next_list(options)
@@ -302,7 +371,15 @@ module Jekyll
 
       def sort(options)
         options = { :node => @root, :order =>
-          'lexical', :reverse => false }.merge(options)
+          'lexical', :reverse => false, :level => nil }.merge(options)
+
+        # Keep track of the current indentation level.
+        if options[:level] == nil
+          # `root'(0) and `/pages'(1) should be exluded.
+          options[:level] = 1
+        else
+          options[:level] += 1
+        end
 
         options[:node].children.each do |child|
           if options[:order] == 'lexical'
@@ -312,12 +389,14 @@ module Jekyll
               options[:reverse]
           elsif options[:order] == 'custom'
             child.sort_children_by_custom_list :reverse =>
-              options[:reverse], :sort_array => @custom_sort_array
+              options[:reverse], :sort_arrays =>
+              @custom_sort_array, :level => options[:level]
           else
             child.sort_children_lexically :reverse => options[:reverse]
           end
           self.sort :node => child, :reverse =>
-            options[:reverse], :order => options[:order]
+            options[:reverse], :order => options[:order], :level =>
+            options[:level]
         end
 
         # (Re-)Generate the previous/next list for this tree.
@@ -532,7 +611,7 @@ module Jekyll
         path_tree =
           Tree.new(TreeNode.new('root', ['data'],
                                 [TreeNode.new(@top_level_dir_name,
-                                              ['data'])]))
+                                              ['data'])]), :site => site)
 
         path_tree.insert_pathes({ @top_level_dir_name =>
                                   @tree[@top_level_dir_name] })
@@ -904,9 +983,6 @@ module Jekyll
       context.registers[:site].data[:toc_tree].sort :node =>
         toc_tree.root, :order => 'lexical', :reverse => true
 
-      # toc_tree.sort :node => toc_tree.root, :order =>
-      #   'lexical', :reverse => true
-
       if !@text.empty?
 
         # Sort order: lexical
@@ -942,6 +1018,9 @@ module Jekyll
                        '').strip
         end
 
+      else
+        toc_tree.sort :node => toc_tree.root, :order =>
+          'lexical', :reverse => true
       end
 
       if reverse_marker == 'reverse'

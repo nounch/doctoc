@@ -1,0 +1,38 @@
+---
+#==========================================================================
+# Each key refers to an indentation level; e.g. `1' is the top level, `2'
+# is the second indentation level, `3' the third one etc.
+#==========================================================================
+
+# Top level
+1:
+  - colors
+  - animals
+
+# Second level of indentation
+2:
+  - dark
+  - bright
+
+  - more nonsense
+  - nonsense
+
+# Third level of indentation
+3:
+  - orange
+  - yellow
+  - red
+
+  - CDE Truck
+  - ABC Truck
+
+  - blue
+  - purple
+
+#==========================================================================
+# The `all' section includes a sorting order which should be applied
+# throughout all indentation levels.
+#==========================================================================
+all:
+  - FGH Truck
+  - IJK Truck
