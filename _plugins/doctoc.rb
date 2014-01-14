@@ -142,7 +142,7 @@ module Jekyll
         is_flat = !children_empty_states.select { |c| c == true}.empty?
 
         html = []
-        if !@children.empty? && is_flat
+        if !@children.empty? && is_flat && 0 != 0
           # Completely flat lists
           html << '<ul>'
           @children.each do |c|
@@ -323,13 +323,13 @@ eos
       end
 
       def generate_custom_sort_array
-        # Create the config directory if it does not exist yet
+        # Create the config directory if it does not exist yet.
         dirname = File.join(File.join(@site.source,
                                       File.join(@top_level_dir_name,
                                                 '_config')))
         Dir.mkdir(dirname) unless Dir.exists?(dirname)
 
-        # Create the sorting config file if it does not exist yet
+        # Create the sorting config file if it does not exist yet.
         file = File.join(File.join(@site.source,
                                    File.join(@top_level_dir_name,
                                              '_config')), 'sorting.yml')
@@ -494,6 +494,38 @@ eos
         @name = name
 
         self.process(@name)
+
+        @fallback_template_template = <<-eos
+---
+layout: -
+title: Fallback
+permalink: /
+---
+
+<div class="fallback">
+  <h2>{{ page.current_node }} <em>(Fallback)</em></h2>
+  <p>There is not much to find on this page.</p>
+  <p>Instead, go one level up to <strong><a href="{{ page.parent }}">{{ page.parent_name }}</a></strong>.</p>
+</div>
+eos
+
+        # Create the fallback template directory if it does not exist yet.
+        dirname = File.join(File.join(site.source,
+                                      File.join(top_level_dir_name,
+                                                '_fallback')))
+        Dir.mkdir(dirname) unless Dir.exists?(dirname)
+
+        # Create the fallback template if it does not exist yet.
+        file = File.join(File.join(site.source,
+                                   File.join(top_level_dir_name,
+                                             '_fallback')), 'index.html')
+
+        # Write sample data to the fallback template.
+        File.open(file, 'w') do |f|
+          f.write @custom_sort_yaml_template
+        end if !File.exists? file
+
+        # Process the fallback template.
         self.read_yaml(File.join(base,
                                  File.join(top_level_dir_name,
                                            '_fallback')), 'index.html')
@@ -518,7 +550,13 @@ eos
       def generate_index_pages(site, pathes, path_tree, toc)
         pathes.each_pair do |key, value|
           value.each_pair do |k, v|
-            referrer_path = path_tree.find_parent(k).name
+            parent_path = path_tree.find_parent(k).name
+            if parent_path == @top_level_dir_name
+              parent_path = ''
+              has_parent = 'false'
+            else
+              has_parent = 'true'
+            end
             if File.basename(k) != 'index.html'
               if !File.file?(File.join(site.source,
                                        File.join(k, 'index.html')))
@@ -526,9 +564,10 @@ eos
                   IndexPage.new(site, site.source,
                                 '/',
                                 'index.html', {
-                                  'referrer' => referrer_path,
-                                  'referrer_name' =>
-                                  File.basename(referrer_path),
+                                  'parent' => parent_path,
+                                  'has_parent' => has_parent,
+                                  'parent_name' =>
+                                  File.basename(parent_path),
                                   'doctoc' => toc,
                                   'path' =>
                                   File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, ''),
@@ -1031,10 +1070,6 @@ eos
 
       toc_tree.sort :node => toc_tree.root, :order =>
         sort_order, :reverse => reverse
-
-      toc = toc_tree.find('/' +
-                          File.dirname(context.registers[:page]['path']),
-                          toc_tree.root, true)
 
       '' # This tag should not render anything.
     end
