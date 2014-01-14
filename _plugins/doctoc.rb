@@ -1,3 +1,5 @@
+require 'pp'
+
 ##########################################################################
 # DISCLAIMER
 ##########################################################################
@@ -82,6 +84,24 @@ module Jekyll
         @children = @children.reverse! if options[:reverse]
       end
 
+      def sort_children_by_custom_list(options)
+        options = { :reverse => false, :sort_array => [] }.merge(options)
+
+        @children.each_with_index do |child, i|
+          options[:sort_array].reverse.each do |string|
+            if File.basename(child.name) == string
+              # if string == 'bright' || string == 'dark'
+              # if string == 'colors'
+              #   puts "child: #{child.children.collect { |c| c.name }}"
+              # end
+              @children.insert(0, @children.delete_at(i))
+            end
+          end
+        end
+
+        @children = @children.reverse! if options[:reverse]
+      end
+
       def pp(counter, string)
         string << ' ' * (counter * @pp_indentation_width) +
           File.basename(@name) + "\n"
@@ -142,7 +162,20 @@ module Jekyll
 
       def htmlize(html, options)
         options = { :previous_children_empty => nil, :add_class =>
-          [nil, ''] }.merge(options)
+          [nil, ''], :counter => 0, :first_list_element =>
+          false }.merge(options)
+
+        # Counter handling for leaf node lists
+        children_empty_states = @children.collect { |c| c.children.empty? }
+        if !children_empty_states.empty?
+          is_flat = !children_empty_states.select { |c| c == true}.empty?
+        else
+          is_flat = false
+        end
+        if !@children.empty? && is_flat
+          options[:counter] = (@children.length - 1)
+          options[:first_list_element] = true
+        end
 
         class_target = options[:add_class][0]
         if class_target != nil && class_target == @name
@@ -156,14 +189,14 @@ module Jekyll
           html << '<ul>'
         end
 
-        if options[:previous_children_empty] != true && @children.empty? &&
-            Tree.current_children_empty != true
-          html << '<ul>'
+        if @children.empty? && options[:first_list_element]
+          html << '<ul><!-- UL -->'
+          options[:first_list_element] = false
         end
 
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename @name}</a></li>"
+ #{class_attr}href=\"#{@name}\">#{File.basename @name}</a></li><!-- #{options[:counter]} - #{options[:previous_children_empty]}-->"
 
         # Semi-global state!
         #
@@ -174,18 +207,31 @@ module Jekyll
         Tree.current_children_empty = @children.empty?
 
         @children.each do |child|
+          # Non-first list elements of a leaf node list decrease the
+          # counter.
+          if child.children.empty? && Tree.current_children_empty
+            options[:counter] -= 1
+          end
+
           child.htmlize html, :previous_children_empty =>
-            Tree.current_children_empty, :add_class => options[:add_class]
+            Tree.current_children_empty, :add_class => options[:add_class],
+          :counter => options[:counter], :first_list_element =>
+            options[:first_list_element]
+
+          # Unmark every node leaf list element which is not the first
+          # one of this list.
+          if child.children.empty? && Tree.current_children_empty
+            options[:first_list_element] = false
+          end
+        end
+
+        if options[:previous_children_empty] == true &&
+            @children.empty? == true && options[:counter] == 0
+          html << "</ul><!-- /UL #{@name} - #{options[:counter]} -->"
         end
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
-          html << '</ul>'
-        end
-
-        if options[:previous_children_empty] != true &&
-            !@children.empty? &&
-            !Tree.current_children_empty != true
           html << '</ul>'
         end
 
@@ -207,6 +253,24 @@ module Jekyll
         @current_children_empty  # Semi-global state!
         @prev_next_list = []
         @top_level_dir_name = '/pages'
+        @custom_sort_array =
+          [
+           'animals',
+           'colors',
+
+           'orange',
+           'red',
+           'yellow',
+
+           'ABC Truck',
+           'CDE Truck',
+
+           'blue',
+           'purple',
+
+           'dark',
+           'bright',
+          ]
       end
 
       def Tree::current_children_empty
@@ -244,6 +308,9 @@ module Jekyll
           elsif options[:order] == 'string_length'
             child.sort_children_by_string_length :reverse =>
               options[:reverse]
+          elsif options[:order] == 'custom'
+            child.sort_children_by_custom_list :reverse =>
+              options[:reverse], :sort_array => @custom_sort_array
           else
             child.sort_children_lexically :reverse => options[:reverse]
           end
@@ -255,13 +322,6 @@ module Jekyll
         self.generate_prev_next_list :node => self.find('/pages',
                                                         self.root, true)
       end
-
-      # def sort(options)
-      #   options = { :node => @root, :order =>
-      #     'lexical', :reverse => false }.merge(options)
-      #   @root.sort :node => options[:node], :order => options[:order],
-      #   :reverse => options[:reverse]
-      # end
 
       def find(node_name, node, is_node=false)
         # Special case: the searched node is one of the children of the
@@ -492,9 +552,6 @@ module Jekyll
         # self.generate_prev_next_list @tree
         # self.generate_prev_next_list :node =>
         #   path_tree.find('/pages', path_tree.root, true)
-
-        # puts '--------------------'
-        # pp path_tree.prev_next_list
 
         # Add shared data to each page
         site.pages.each do |page|
@@ -831,6 +888,7 @@ module Jekyll
       # Markers
       @lexical_sort_marker = 'lexical'
       @string_length_sort_marker = 'string_length'
+      @custom_sort_marker = 'custom'
     end
 
     def render(context)
@@ -871,6 +929,17 @@ module Jekyll
                        '').strip
         end
 
+        # Sort order: custom
+        if @text =~ /^ *#{Regexp.quote(@custom_sort_marker)} *$/
+          sort_order = 'custom'
+        elsif @text =~ /^ *#{Regexp.quote(@custom_sort_marker)} *,/
+          sort_order = 'custom'
+          # Reverse sort order
+          reverse_marker =
+            @text.gsub(/^ *#{Regexp.quote(@custom_sort_marker)} *,/,
+                       '').strip
+        end
+
       end
 
       if reverse_marker == 'reverse'
@@ -879,14 +948,14 @@ module Jekyll
         reverse = false
       end
 
-      toc_tree.sort :node => toc_tree.root, :order =>
-        sort_order, :reverse => reverse
+      # toc_tree.sort :node => toc_tree.root, :order =>
+      #   sort_order, :reverse => reverse
 
       toc = toc_tree.find('/' +
                           File.dirname(context.registers[:page]['path']),
                           toc_tree.root, true)
-      # html += toc.html :children_only => true
-      ''
+
+      '' # This tag should not render anything.
     end
 
   end
