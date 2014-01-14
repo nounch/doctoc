@@ -184,19 +184,19 @@ module Jekyll
           class_attr = ''
         end
 
+        # if @children.empty? && options[:first_list_element]
+        #   html << '<ul><!-- UL -->'
+        #   options[:first_list_element] = false
+        # end
+
+        html <<
+          "<li><a\
+ #{class_attr}href=\"#{@name}\">#{File.basename @name}</a>"
+
         # Leaf nodes should not be lists themselves
         if !@children.empty?
           html << '<ul>'
         end
-
-        if @children.empty? && options[:first_list_element]
-          html << '<ul><!-- UL -->'
-          options[:first_list_element] = false
-        end
-
-        html <<
-          "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename @name}</a></li><!-- #{options[:counter]} - #{options[:previous_children_empty]}-->"
 
         # Semi-global state!
         #
@@ -225,15 +225,17 @@ module Jekyll
           end
         end
 
-        if options[:previous_children_empty] == true &&
-            @children.empty? == true && options[:counter] == 0
-          html << "</ul><!-- /UL #{@name} - #{options[:counter]} -->"
-        end
+        # if options[:previous_children_empty] == true &&
+        #     @children.empty? == true && options[:counter] == 0
+        #   html << "</ul><!-- /UL #{@name} - #{options[:counter]} -->"
+        # end
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
           html << '</ul>'
         end
+
+        html << "</li><!-- #{options[:counter]} - #{options[:previous_children_empty]}-->"
 
         html
       end
@@ -255,15 +257,15 @@ module Jekyll
         @top_level_dir_name = '/pages'
         @custom_sort_array =
           [
-           'animals',
            'colors',
+           'animals',
 
            'orange',
            'red',
            'yellow',
 
-           'ABC Truck',
            'CDE Truck',
+           'ABC Truck',
 
            'blue',
            'purple',
@@ -948,8 +950,8 @@ module Jekyll
         reverse = false
       end
 
-      # toc_tree.sort :node => toc_tree.root, :order =>
-      #   sort_order, :reverse => reverse
+      toc_tree.sort :node => toc_tree.root, :order =>
+        sort_order, :reverse => reverse
 
       toc = toc_tree.find('/' +
                           File.dirname(context.registers[:page]['path']),
