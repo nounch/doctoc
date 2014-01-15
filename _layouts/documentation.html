@@ -34,7 +34,7 @@
       <div class="row">
         <div class="columns large-3">
           <div class="panel">
-            <!-- {#{ page.doctoc }} -->
+            <!-- {{ page.doctoc }} -->
 	    {% doctoc highlight-current-node, my-custom-highlight %}
           </div>
         </div>
@@ -42,7 +42,9 @@
 
           <div class="row">
             <div class="columns large-12 panel">
-              {% doctoc_up Go up %}
+	      <p>{% doctoc_breadcrumb → %}</p>
+	      <hr />
+              <p>{% doctoc_up Go up %}</p>
             </div>
           </div>
 

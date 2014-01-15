@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 require 'pp'
 
 ##########################################################################
@@ -11,8 +12,9 @@ require 'pp'
 # - Hard coupling
 #
 # Specifics:
-# - bulky ifs and RegEx matching in Tag classes
-# - messy argument hash handling in methods (`options')
+# - Bulky ifs and RegEx matching in Tag classes; argument parsing for
+#   Liquid tags is not unified
+# - Messy argument hash handling in methods (`options')
 # - The `Tree' class is not a 100% clean top-level entry point for its
 #   `TreeNode's.
 # - The `TreeNode' HTML rendering is messy.
@@ -21,6 +23,13 @@ require 'pp'
 #    Probably this is also a shortcoming of the Jekyll plugin API.
 # - Both, `Tree' and `Generator' have a `@top_level_dir' vairable. Only
 #   `Tree' shouldd have one.
+# - `options' hash mixed with new-style default arguments. The `options'
+#   hash should be preferred.
+# - There are no conventions: Tree element name handling: `_' and ` '
+#   (single space) are replaced all over the place, sometimes `/' in the
+#   the beginning of path names is added or removed manually.
+# - (There is the assumption that path names will always be Unix path
+#   names which is only correct as long as Jekyll will not support them.)
 
 module Jekyll
 
@@ -242,7 +251,8 @@ module Jekyll
           html << '</ul>'
         end
 
-        html << "</li><!-- #{options[:counter]} - #{options[:previous_children_empty]}-->"
+        # html << "</li><!-- #{options[:counter]} - #{options[:previous_children_empty]}-->"  # DEBUG
+        html << "</li>"
 
         html
       end
@@ -251,7 +261,7 @@ module Jekyll
 
 
     class Tree
-      attr_accessor :root, :prev_next_list
+      attr_accessor :root, :prev_next_list, :top_level_dir_name
 
       def initialize(root, options)
         options = { :site => nil }.merge(options)
@@ -421,7 +431,6 @@ eos
           else
             @last_found_node = children[0]  # Semi-global state!
           end
-
         end
         return @last_found_node
       end
@@ -469,6 +478,79 @@ eos
         string = []
         @root.pp counter, string
         string.join
+      end
+
+      def breadcrumb(node, options)
+        options = { :parents => [], :separator => '', :no_html =>
+          false }.merge(options)
+
+        if options[:parents].empty?
+          options[:parents] << node.name
+        end
+        parent_names = self.generate_breadcrumb_list node, options
+        html = ''
+
+        # Disregard the top level dir name (`pages') since it is not
+        # linkable anyway.
+        if parent_names[0] == @top_level_dir_name
+          parent_names = parent_names[1..-1]
+        end
+
+        if !options[:no_html]
+          options[:separator] = '<span> ' + options[:separator] +
+            ' </span>'
+          separator = options[:separator] + ' '
+          parent_names[0..-2].each_with_index do |name, i|
+            html << "<ul><li>#{separator if i > 0}<a\
+ href=\"#{name}\">#{File.basename(name)}</a>"
+          end
+
+          # The child should not be link since it is the current page
+          # anyway. Hide it if there are no parents.
+          if parent_names.length > 1
+            html << "<ul><li>#{separator}<\
+span>#{File.basename(File.basename(parent_names[-1]))}</span></li><ul>"
+          end
+
+          parent_names[0..-2].each do |name|
+            html << "</ul></li>"
+          end
+
+        else
+
+          if options[:separator] == ''
+            separator = '<span> / </span>'
+          else
+            separator = "<span> #{options[:separator]} </span>"
+          end
+
+          parent_names[0..-2].each_with_index do |name, i|
+            html << "#{separator if i > 0}<a\
+ href=\"#{name}\">#{File.basename(name)}</a>"
+          end
+          # The child should not be link since it is the current page
+          # anyway. Hide it if there are no parents.
+          if parent_names.length > 1
+            html <<
+              "#{separator}<span>#{File.basename(parent_names[-1])}<span>"
+          end
+        end
+
+        html
+      end
+
+      def generate_breadcrumb_list(node, options)
+        options = { :parents => [] }.merge(options)
+
+        if node.name != @top_level_dir_name
+          parent = self.find_parent(node.name)
+          if parent.name != @top_level_dir_name
+            options[:parents] << parent.name
+            self.breadcrumb parent, :parents => options[:parents]
+          end
+        end
+
+        options[:parents].reverse
       end
 
       def html(options)
@@ -1077,11 +1159,67 @@ eos
   end
 
 
+  #########################################################################
+  # `doctoc_breadcrumb' Tag
+  #########################################################################
+
+  class DocTocBreadcrumbTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+      # Marker
+      @nitpicky_marker = 'nitpicky'
+    end
+
+    def render(context)
+      html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      path = context.registers[:page]['path']
+      toc = toc_tree.find('/' +
+                          File.dirname(context.registers[:page]['path']),
+                          toc_tree.root, true)
+
+      if toc.name != toc_tree.top_level_dir_name
+        current = toc
+
+        if !@text.empty?
+
+          if @text =~ /^ *#{Regexp.quote(@nitpicky_marker)} *$/
+            html = toc_tree.breadcrumb(current, :parent => '')
+          elsif @text =~ /^ *#{Regexp.quote(@nitpicky_marker)} *,/
+            separator =
+              @text.gsub(/^ *#{Regexp.quote(@nitpicky_marker)} *,/,
+                         '').strip
+            html = toc_tree.breadcrumb(current, :parent => '',
+                                       :separator => separator)
+          else
+            html = toc_tree.breadcrumb(current, :parent => '',
+                                       :separator => @text.strip,
+                                       :no_html => true)
+          end
+
+        else
+          html = toc_tree.breadcrumb(current, :parent => '', :no_html =>
+                                     true, :separator => '')
+        end
+
+        html
+      else
+        ''  # Do not render anything.
+      end
+    end
+
+  end
+
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
   Liquid::Template.register_tag('doctoc_prev', Jekyll::DocTocPreviousTag)
   Liquid::Template.register_tag('doctoc_next', Jekyll::DocTocNextTag)
   Liquid::Template.register_tag('doctoc_sort', Jekyll::DocTocSortTag)
+  Liquid::Template.register_tag('doctoc_breadcrumb',
+                                Jekyll::DocTocBreadcrumbTag)
 
 end
