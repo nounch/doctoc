@@ -50,6 +50,14 @@
 
           {{ content }}
 
+	  <hr />
+
+	  {% doctoc_siblings <em>Siblings:</em> %}
+
+	  {% if page.doctoc_has_siblings == 'true' %}
+	  Siblings:
+	  {% doctoc_siblings %}
+	  {% endif %}
 
           <div class="row panel callout">
             <div class="column large-12">

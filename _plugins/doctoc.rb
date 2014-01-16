@@ -332,6 +332,20 @@ eos
         @current_children_empty = value
       end
 
+      def siblings(node)
+        node_name = node.name
+        siblings = []
+        if node_name != @top_level_dir_name
+          siblings = find_parent(node_name).children.dup
+          siblings.each_with_index do |child, i|
+            if child.name == node_name
+              siblings.delete_at i
+            end
+          end
+        end
+        siblings
+      end
+
       def generate_custom_sort_array
         # Create the config directory if it does not exist yet.
         dirname = File.join(File.join(@site.source,
@@ -1213,6 +1227,45 @@ eos
   end
 
 
+  #########################################################################
+  # `doctoc_siblings' Tag
+  #########################################################################
+
+  class DocTocSiblingsTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+    end
+
+    def render(context)
+      html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      path = context.registers[:page]['path']
+      toc = toc_tree.find('/' +
+                          File.dirname(context.registers[:page]['path']),
+                          toc_tree.root, true)
+
+      if toc.name != toc_tree.top_level_dir_name
+        siblings = toc_tree.siblings toc
+        if siblings.length > 0
+          html << @text.strip
+          html << '<ul>'
+          siblings.each do |sibling|
+            html << "<li><a\
+ href=\"sibling.name\">#{File.basename(sibling.name)}</a></li>"
+          end
+          html << '</ul>'
+        end
+      else
+        ''  # Do not render anything.
+      end
+
+      html
+    end
+
+  end
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
@@ -1221,5 +1274,7 @@ eos
   Liquid::Template.register_tag('doctoc_sort', Jekyll::DocTocSortTag)
   Liquid::Template.register_tag('doctoc_breadcrumb',
                                 Jekyll::DocTocBreadcrumbTag)
+  Liquid::Template.register_tag('doctoc_siblings',
+                                Jekyll::DocTocSiblingsTag)
 
 end
