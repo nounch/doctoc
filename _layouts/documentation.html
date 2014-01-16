@@ -33,7 +33,7 @@
 
       <div class="row">
         <div class="columns large-3">
-          <div class="panel">
+          <div class="panel" id="navcontainer">
             <!-- {{ page.doctoc }} -->
 	    {% doctoc highlight-current-node, my-custom-highlight %}
           </div>
@@ -50,6 +50,8 @@
 
           {{ content }}
 
+	  <hr />
+	  {% doctoc_children_of /pages/Machines/Big_Machines/software/, <em>Children for <code>/pages/Machines/Big_Machines/software/</code></em> %}
 	  <hr />
 	  {% doctoc_children <em>Children:</em> %}
 	  <hr />

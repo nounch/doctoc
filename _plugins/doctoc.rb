@@ -698,15 +698,6 @@ eos
         end
       end
 
-      # def generate_prev_next_list(pathes)
-      #   pathes.each_pair do |key, value|
-      #     if key != @top_level_dir_name
-      #       @prev_next_list << key if File.basename(key) != 'index.html'
-      #     end
-      #     self.generate_prev_next_list value
-      #   end
-      # end
-
       def generate_tree(pathes)
         pathes.each do |path|
           current = @tree
@@ -1306,6 +1297,52 @@ eos
 
   end
 
+
+  #########################################################################
+  # `doctoc_children_of' Tag
+  #########################################################################
+
+  class DocTocChildrenOfTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+    end
+
+    def render(context)
+      html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      if @text =~ /^ *[^,] *$/
+        path = @text.strip
+      else
+        path = @text.gsub(/,.*/, '').strip
+      end
+      path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      puts "PATH: #{path} - #{toc.name}"
+
+      if toc.name != toc_tree.top_level_dir_name
+        children = toc.children
+        if children.length > 0
+          if @text =~ /.*,.*/
+            html << @text.gsub(/^.*,/, '').strip
+          end
+          html << '<ul>'
+          children.each do |child|
+            html << "<li><a\
+ href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
+          end
+          html << '</ul>'
+        end
+      else
+        ''  # Do not render anything.
+      end
+
+      html
+    end
+
+  end
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
@@ -1318,5 +1355,7 @@ eos
                                 Jekyll::DocTocSiblingsTag)
   Liquid::Template.register_tag('doctoc_children',
                                 Jekyll::DocTocChildrenTag)
+  Liquid::Template.register_tag('doctoc_children_of',
+                                Jekyll::DocTocChildrenOfTag)
 
 end
