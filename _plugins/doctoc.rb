@@ -1266,6 +1266,46 @@ eos
 
   end
 
+
+  #########################################################################
+  # `doctoc_children' Tag
+  #########################################################################
+
+  class DocTocChildrenTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+    end
+
+    def render(context)
+      html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      path = context.registers[:page]['path']
+      toc = toc_tree.find('/' +
+                          File.dirname(context.registers[:page]['path']),
+                          toc_tree.root, true)
+
+      if toc.name != toc_tree.top_level_dir_name
+        children = toc.children
+        if children.length > 0
+          html << @text.strip
+          html << '<ul>'
+          children.each do |child|
+            html << "<li><a\
+ href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
+          end
+          html << '</ul>'
+        end
+      else
+        ''  # Do not render anything.
+      end
+
+      html
+    end
+
+  end
+
   # Register the Liquid tags
   Liquid::Template.register_tag('doctoc', Jekyll::DocTocTag)
   Liquid::Template.register_tag('doctoc_up', Jekyll::DocTocUpTag)
@@ -1276,5 +1316,7 @@ eos
                                 Jekyll::DocTocBreadcrumbTag)
   Liquid::Template.register_tag('doctoc_siblings',
                                 Jekyll::DocTocSiblingsTag)
+  Liquid::Template.register_tag('doctoc_children',
+                                Jekyll::DocTocChildrenTag)
 
 end
