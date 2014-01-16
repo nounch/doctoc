@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-require 'pp'
 
 ##########################################################################
 # DISCLAIMER
@@ -1319,7 +1318,6 @@ eos
       end
       path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
       toc = toc_tree.find('/' + path, toc_tree.root, true)
-      puts "PATH: #{path} - #{toc.name}"
 
       if toc.name != toc_tree.top_level_dir_name
         children = toc.children
@@ -1332,6 +1330,49 @@ eos
             html << "<li><a\
  href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
           end
+          html << '</ul>'
+        end
+      else
+        ''  # Do not render anything.
+      end
+
+      html
+    end
+
+  end
+
+
+  #########################################################################
+  # `doctoc_subtree_of' Tag
+  #########################################################################
+
+  class DocTocSubtreeOfTag < Liquid::Tag
+
+    def initialize(tag_name, text, tokens)
+      super
+      @text = text
+    end
+
+    def render(context)
+      html = ''
+      subtree_html = ''
+      toc_tree = context.registers[:site].data[:toc_tree]
+      if @text =~ /^ *[^,] *$/
+        path = @text.strip
+      else
+        path = @text.gsub(/,.*/, '').strip
+      end
+      path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
+
+      if toc.name != toc_tree.top_level_dir_name
+        subtree_html << toc.html(:children_only => true)
+        if subtree_html != ''
+          if @text =~ /.*,.*/
+            html << @text.gsub(/^.*,/, '').strip
+          end
+          html << '<ul>'
+          html << subtree_html
           html << '</ul>'
         end
       else
@@ -1357,5 +1398,7 @@ eos
                                 Jekyll::DocTocChildrenTag)
   Liquid::Template.register_tag('doctoc_children_of',
                                 Jekyll::DocTocChildrenOfTag)
+  Liquid::Template.register_tag('doctoc_subtree_of',
+                                Jekyll::DocTocSubtreeOfTag)
 
 end
