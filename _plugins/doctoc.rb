@@ -1253,7 +1253,7 @@ eos
           html << '<ul>'
           siblings.each do |sibling|
             html << "<li><a\
- href=\"sibling.name\">#{File.basename(sibling.name)}</a></li>"
+ href=\"#{sibling.name}\">#{File.basename(sibling.name)}</a></li>"
           end
           html << '</ul>'
         end
