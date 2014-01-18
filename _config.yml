@@ -3,3 +3,4 @@ markdown: redcarpet
 pygments: true
 relative_permalinks: true
 doctoc_dir: /site
+doctoc_fallback_extension: markdown

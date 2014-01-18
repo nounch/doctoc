@@ -270,7 +270,8 @@ module Jekyll
 
       def initialize(root, options)
         options = { :site => nil, :top_level_dir_name =>
-          '/pages' }.merge(options)
+          '/pages', :leaf_node_file_names =>
+          ['index.html', 'index.markdown', 'index.md'] }.merge(options)
 
         @site = options[:site]
         @root = root
@@ -281,6 +282,7 @@ module Jekyll
         @current_children_empty  # Semi-global state!
         @prev_next_list = []
         @top_level_dir_name = options[:top_level_dir_name]
+        @leaf_node_file_names = options[:leaf_node_file_names]
 
         # Custom sorting-related config
         @custom_sorting_config_file =
@@ -392,7 +394,9 @@ eos
         options = { :node => @root }.merge(options)
         name = options[:node].name
         if name != @top_level_dir_name
-          @prev_next_list << name if File.basename(name) != 'index.html'
+          if !(@leaf_node_file_names.include? File.basename(name))
+            @prev_next_list << name
+          end
         end
         options[:node].children.each do |child|
           self.do_generate_prev_next_list :node => child
@@ -484,7 +488,7 @@ eos
       def insert_pathes(pathes)
         pathes.each_pair do |key, value|
           value.each_pair do |k, v|
-            if File.basename(k) != 'index.html'
+            if !(@leaf_node_file_names.include? File.basename(k))
               self.insert_child(key, TreeNode.new(k, ['data']))
             end
           end
@@ -595,6 +599,9 @@ span>#{File.basename(File.basename(parent_names[-1]))}</span></li><ul>"
         @dir = dir
         @name = name
 
+        # Note: Jekyll uses Page::proces to determine the file extension
+        # which then is used to determine the converter. That's why the
+        # file extension has to be explicitely defined in the config file.
         self.process(@name)
 
         @fallback_template_template = <<-eos
@@ -620,17 +627,17 @@ eos
         # Create the fallback template if it does not exist yet.
         file = File.join(File.join(site.source,
                                    File.join(top_level_dir_name,
-                                             '_fallback')), 'index.html')
+                                             '_fallback')), name)
 
         # Write sample data to the fallback template.
         File.open(file, 'w') do |f|
-          f.write @custom_sort_yaml_template
+          f.write @fallback_template_template
         end if !File.exists? file
 
         # Process the fallback template.
         self.read_yaml(File.join(base,
                                  File.join(top_level_dir_name,
-                                           '_fallback')), 'index.html')
+                                           '_fallback')), name)
         data.each_pair { |key, value| self.data[key] = value }
       end
 
@@ -647,6 +654,9 @@ eos
         @nested_list = ''
         @top_level_dir_name = '/pages'
         @prev_next_list = []
+        @leaf_node_file_names = ['index.html', 'index.markdown',
+                                 'index.md']
+        @index_page_file_name = "index.html"
       end
 
       def generate_index_pages(site, pathes, path_tree, toc)
@@ -659,13 +669,14 @@ eos
             else
               has_parent = 'true'
             end
-            if File.basename(k) != 'index.html'
+            if !(@leaf_node_file_names.include? File.basename(k))
               if !File.file?(File.join(site.source,
-                                       File.join(k, 'index.html')))
+                                       File.join(k,
+                                                 @index_page_file_name)))
                 index_page =
                   IndexPage.new(site, site.source,
                                 '/',
-                                'index.html', {
+                                @index_page_file_name, {
                                   'parent' => parent_path,
                                   'has_parent' => has_parent,
                                   'parent_name' =>
@@ -673,7 +684,7 @@ eos
                                   'doctoc' => toc,
                                   'path' =>
                                   File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, ''),
-                                            'index.html'),
+                                            @index_page_file_name),
                                   'current_node' => File.basename(k),
                                   'doctoc_prev_next_list' =>
                                   @prev_next_list
@@ -714,7 +725,7 @@ eos
             sub_path = sub_path.gsub(/_/, ' ')
 
             if (current[sub_path] == nil || current[sub_path] == false) &&
-                sub_path != 'index.html'
+                !(@leaf_node_file_names.include? sub_path)
               current[sub_path] = { }
             end
 
@@ -734,6 +745,11 @@ eos
           @top_level_dir_name = '/' +
             site.config['doctoc_dir'].gsub(/\/$/, '').gsub(/^\//, '') ||
             @top_level_dir_name
+
+          if site.config['doctoc_fallback_extension']
+            @index_page_file_name =
+              "index.#{site.config['doctoc_fallback_extension'].strip}"
+          end
         rescue
           # Ignore. If there is no config option, the default will be used
           # anyway.
@@ -757,7 +773,8 @@ eos
           Tree.new(TreeNode.new('root', ['data'],
                                 [TreeNode.new(@top_level_dir_name,
                                               ['data'])]), :site => site,
-                   :top_level_dir_name => @top_level_dir_name)
+                   :top_level_dir_name => @top_level_dir_name,
+                   :leaf_node_file_names => @leaf_node_file_names)
 
         path_tree.insert_pathes({ @top_level_dir_name =>
                                   @tree[@top_level_dir_name] })
