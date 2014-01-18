@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
+require 'pp'
+
 
 ##########################################################################
 # DISCLAIMER
 ##########################################################################
 #
+#
 # Major flaws in this code:
+# - NO TDD!
+# - NO INLINE DOCUMENTATION!
 # - Duplication
 # - if-hell
 # - (Semi-)Global state
@@ -20,8 +25,8 @@
 # - Tag classes duplicate a lot of code among themselves (i.e. a
 #   `previous' and a `next' tag have to do a lot of similar work).
 #    Probably this is also a shortcoming of the Jekyll plugin API.
-# - Both, `Tree' and `Generator' have a `@top_level_dir' vairable. Only
-#   `Tree' shouldd have one.
+# - Both, `Tree' and `Generator' have a `@top_level_dir_name' vairable.
+#   Only`Tree' shouldd have one.
 # - `options' hash mixed with new-style default arguments. The `options'
 #   hash should be preferred.
 # - There are no conventions: Tree element name handling: `_' and ` '
@@ -29,6 +34,7 @@
 #   the beginning of path names is added or removed manually.
 # - (There is the assumption that path names will always be Unix path
 #   names which is only correct as long as Jekyll will not support them.)
+
 
 module Jekyll
 
@@ -263,7 +269,8 @@ module Jekyll
       attr_accessor :root, :prev_next_list, :top_level_dir_name
 
       def initialize(root, options)
-        options = { :site => nil }.merge(options)
+        options = { :site => nil, :top_level_dir_name =>
+          '/pages' }.merge(options)
 
         @site = options[:site]
         @root = root
@@ -273,7 +280,7 @@ module Jekyll
         # If you rebell still do it, at least update this comment!
         @current_children_empty  # Semi-global state!
         @prev_next_list = []
-        @top_level_dir_name = '/pages'
+        @top_level_dir_name = options[:top_level_dir_name]
 
         # Custom sorting-related config
         @custom_sorting_config_file =
@@ -398,7 +405,7 @@ eos
 
         # Keep track of the current indentation level.
         if options[:level] == nil
-          # `root'(0) and `/pages'(1) should be exluded.
+          # `root'(0) and the top level dir(1) should be exluded.
           options[:level] = 1
         else
           options[:level] += 1
@@ -423,8 +430,8 @@ eos
         end
 
         # (Re-)Generate the previous/next list for this tree.
-        self.generate_prev_next_list :node => self.find('/pages',
-                                                        self.root, true)
+        self.generate_prev_next_list :node =>
+          self.find(@top_level_dir_name, self.root, true)
       end
 
       def find(node_name, node, is_node=false)
@@ -470,8 +477,8 @@ eos
         end
 
         # (Re-)Generate the previous/next list for this tree.
-        self.generate_prev_next_list :node => self.find('/pages',
-                                                        self.root, true)
+        self.generate_prev_next_list :node =>
+          self.find(@top_level_dir_name, self.root, true)
       end
 
       def insert_pathes(pathes)
@@ -503,8 +510,8 @@ eos
         parent_names = self.generate_breadcrumb_list node, options
         html = ''
 
-        # Disregard the top level dir name (`pages') since it is not
-        # linkable anyway.
+        # Disregard the top level dir name (default: `pages') since it is
+        # not linkable anyway.
         if parent_names[0] == @top_level_dir_name
           parent_names = parent_names[1..-1]
         end
@@ -719,6 +726,14 @@ eos
       end
 
       def generate(site)
+        # Set the name for the top level directory. This will determine
+        # the root of the URL slug. If there is no `doctoc_dir' config
+        # entry in the config  file (`_config.yml' in the latest Jekyll
+        # version), use the default top level dir name (`/pages').
+        @top_level_dir_name = '/' +
+          site.config['doctoc_dir'].gsub(/\/$/, '').gsub(/^\//, '') ||
+          @top_level_dir_name
+
         page_pathes = site.pages.each.collect { |page| page.path }
 
         generate_tree(page_pathes)
@@ -736,7 +751,8 @@ eos
         path_tree =
           Tree.new(TreeNode.new('root', ['data'],
                                 [TreeNode.new(@top_level_dir_name,
-                                              ['data'])]), :site => site)
+                                              ['data'])]), :site => site,
+                   :top_level_dir_name => @top_level_dir_name)
 
         path_tree.insert_pathes({ @top_level_dir_name =>
                                   @tree[@top_level_dir_name] })
@@ -753,11 +769,6 @@ eos
                        path_tree.root, true).children.each do |child|
           toc += child.html :children_only => false
         end
-
-        # Generate `previous'/`next' link references
-        # self.generate_prev_next_list @tree
-        # self.generate_prev_next_list :node =>
-        #   path_tree.find('/pages', path_tree.root, true)
 
         # Add shared data to each page
         site.pages.each do |page|
