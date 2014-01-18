@@ -1,3 +1,5 @@
 - Update `Tree::custom_sort_yaml_template' with sensible sample data.
-- `siblings_of /Path/to/thing/or/different/thing' tag
-- `children_of /Path/to/thing/or/different/thing' tag
+- Rename `_fallback/index.html' to `_fallback/index.markdown'.
+- Insert `_fallback/index.html' content.
+- Hanlde `*.markdown' and `*.md' files besides `index.html' files
+  everywhere.

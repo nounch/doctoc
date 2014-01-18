@@ -730,9 +730,14 @@ eos
         # the root of the URL slug. If there is no `doctoc_dir' config
         # entry in the config  file (`_config.yml' in the latest Jekyll
         # version), use the default top level dir name (`/pages').
-        @top_level_dir_name = '/' +
-          site.config['doctoc_dir'].gsub(/\/$/, '').gsub(/^\//, '') ||
-          @top_level_dir_name
+        begin
+          @top_level_dir_name = '/' +
+            site.config['doctoc_dir'].gsub(/\/$/, '').gsub(/^\//, '') ||
+            @top_level_dir_name
+        rescue
+          # Ignore. If there is no config option, the default will be used
+          # anyway.
+        end
 
         page_pathes = site.pages.each.collect { |page| page.path }
 
