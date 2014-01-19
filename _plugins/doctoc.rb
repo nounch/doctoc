@@ -270,7 +270,8 @@ module Jekyll
       def initialize(root, options)
         options = { :site => nil, :top_level_dir_name =>
           '/pages', :leaf_node_file_names =>
-          ['index.html', 'index.markdown', 'index.md'] }.merge(options)
+          ['index.html', 'index.markdown', 'index.md',
+           'index.textile'] }.merge(options)
 
         @site = options[:site]
         @root = root
@@ -656,7 +657,7 @@ eos
         @top_level_dir_name = '/pages'
         @prev_next_list = []
         @leaf_node_file_names = ['index.html', 'index.markdown',
-                                 'index.md']
+                                 'index.md', 'index.textile']
         @index_page_file_name = "index.html"
       end
 
