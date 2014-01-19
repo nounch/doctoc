@@ -163,7 +163,7 @@ module Jekyll
             c.name = c.name.gsub(/ /, '_')
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+ #{class_attr}href=\"#{c.name}\">#{File.basename c.name.gsub(/_/, ' ')}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -213,7 +213,7 @@ module Jekyll
         @name = @name.gsub(/ /, '_')
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename @name}</a>"
+ #{class_attr}href=\"#{@name}\">#{File.basename @name.gsub(/_/, ' ')}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
