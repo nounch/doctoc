@@ -146,7 +146,7 @@ module Jekyll
 
         class_target = options[:add_class][0]
         if class_target != nil && class_target == @name
-          class_attr = "class=\"#{options[:add_class][1]}\" "
+          class_attr = "class=\"#{options[:add_class][1].strip}\" "
         else
           class_attr = ''
         end
@@ -160,9 +160,10 @@ module Jekyll
           html << '<ul>'
           @children.each do |c|
 
+            c.name = c.name.gsub(/ /, '_')
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name.gsbub(/ /, '_')}\">#{File.basename c.name}</a></li>"
+ #{class_attr}href=\"#{c.name}\">#{File.basename c.name}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -199,7 +200,7 @@ module Jekyll
 
         class_target = options[:add_class][0]
         if class_target != nil && class_target == @name
-          class_attr = "class=\"#{options[:add_class][1]}\" "
+          class_attr = "class=\"#{options[:add_class][1].strip}\" "
         else
           class_attr = ''
         end
@@ -209,9 +210,10 @@ module Jekyll
         #   options[:first_list_element] = false
         # end
 
+        @name = @name.gsub(/ /, '_')
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name.gsub(/ /, '_')}\">#{File.basename @name}</a>"
+ #{class_attr}href=\"#{@name}\">#{File.basename @name}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
