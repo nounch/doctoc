@@ -162,7 +162,7 @@ module Jekyll
 
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name}\">#{File.basename c.name}</a></li>"
+ #{class_attr}href=\"#{c.name.gsbub(/ /, '_')}\">#{File.basename c.name}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -211,7 +211,7 @@ module Jekyll
 
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename @name}</a>"
+ #{class_attr}href=\"#{@name.gsub(/ /, '_')}\">#{File.basename @name}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
@@ -526,7 +526,7 @@ eos
           separator = options[:separator] + ' '
           parent_names[0..-2].each_with_index do |name, i|
             html << "<ul><li>#{separator if i > 0}<a\
- href=\"#{name}\">#{File.basename(name)}</a>"
+ href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
           end
 
           # The child should not be link since it is the current page
@@ -550,7 +550,7 @@ span>#{File.basename(File.basename(parent_names[-1]))}</span></li><ul>"
 
           parent_names[0..-2].each_with_index do |name, i|
             html << "#{separator if i > 0}<a\
- href=\"#{name}\">#{File.basename(name)}</a>"
+ href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
           end
           # The child should not be link since it is the current page
           # anyway. Hide it if there are no parents.
@@ -955,7 +955,7 @@ eos
         if toc.name == File.dirname(context.registers[:page]['path'])
           toc.name = File.dirname toc.name
         end
-        html += "<a href=\"#{toc.name}\">#{link_text}</a>"
+        html += "<a href=\"#{toc.name.gsub(/ /, '_')}\">#{link_text}</a>"
 
       end
 
@@ -1363,7 +1363,7 @@ eos
           html << '<ul>'
           children.each do |child|
             html << "<li><a\
- href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
+ href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
           end
           html << '</ul>'
         end
