@@ -160,10 +160,9 @@ module Jekyll
           html << '<ul>'
           @children.each do |c|
 
-            c.name = c.name.gsub(/ /, '_')
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name}\">#{File.basename c.name.gsub(/_/, ' ')}</a></li>"
+ #{class_attr}href=\"#{c.name.gsub(/ /, '_')}\">#{File.basename(c.name).gsub(/_/, ' ')}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -210,10 +209,9 @@ module Jekyll
         #   options[:first_list_element] = false
         # end
 
-        @name = @name.gsub(/ /, '_')
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename @name.gsub(/_/, ' ')}</a>"
+ #{class_attr}href=\"#{@name.gsub(/ /, '_')}\">#{File.basename(@name)}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
@@ -535,7 +533,7 @@ eos
           # anyway. Hide it if there are no parents.
           if parent_names.length > 1
             html << "<ul><li>#{separator}<\
-span>#{File.basename(File.basename(parent_names[-1]))}</span></li><ul>"
+span>#{File.basename(File.basename(parent_names[-1].gsub(/_/, ' ')))}</span></li><ul>"
           end
 
           parent_names[0..-2].each do |name|
@@ -845,9 +843,8 @@ eos
 
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
-      toc = toc_tree.find('/' +
-                          File.dirname(context.registers[:page]['path']),
-                          toc_tree.root, true)
+      path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
 
       # In case there is no TOC node found or the TOC node that has been
       # found is a leaf node there should not be any HTML emitted.
@@ -867,7 +864,7 @@ eos
                            '')
             end
 
-            html += "<a href=\"#{path}\">#{link_text}</p>"
+            html += "<a href=\"#{path.gsub(/ /, '_')}\">#{link_text}</p>"
 
           else
             if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
@@ -888,7 +885,7 @@ eos
       end
 
       # Check for additional text supplied to the tag.
-      if !@text.empty?
+      if !@text.empty? && toc.respond_to?(:name)
         # Highlight the current node
         if @text =~ / *#{Regexp.quote(@highlight_current_node_marker)} */
           highlight_class = ''
@@ -933,32 +930,35 @@ eos
 
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
-      toc = toc_tree.
-        find_parent('/' + File.dirname(context.registers[:page]['path']))
+      path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
+      toc = toc_tree.find_parent('/' + path)
 
-      # Exclude any top level nodes (usually there should only be one)
-      # since they do not have a node associated with them.
-      if toc_tree.root.children.collect { |c| c.name }.include? toc.name
-        html = ''
-      else
-        link_text = ''
 
-        if !@text.empty?
-          link_text += @text.strip
+      if toc.respond_to? :name
+        # Exclude any top level nodes (usually there should only be one)
+        # since they do not have a node associated with them.
+        if toc_tree.root.children.collect { |c| c.name }.include? toc.name
+          html = ''
         else
-          link_text = File.basename(toc.name)
-        end
+          link_text = ''
 
-        # Required for `_fallback/index.html' since it is automatically
-        # generated which leads to `page.path' not being correct after
-        # it has been attached to it artivicially when creating the
-        # respective `IndexPage'. For some reason Jekyll does not seem
-        # to catch up.
-        if toc.name == File.dirname(context.registers[:page]['path'])
-          toc.name = File.dirname toc.name
-        end
-        html += "<a href=\"#{toc.name.gsub(/ /, '_')}\">#{link_text}</a>"
+          if !@text.empty?
+            link_text += @text.strip
+          else
+            link_text = File.basename(toc.name)
+          end
 
+          # Required for `_fallback/index.html' since it is automatically
+          # generated which leads to `page.path' not being correct after
+          # it has been attached to it artivicially when creating the
+          # respective `IndexPage'. For some reason Jekyll does not seem
+          # to catch up.
+          if toc.name == File.dirname(context.registers[:page]['path'])
+            toc.name = File.dirname toc.name
+          end
+          html += "<a href=\"#{toc.name.gsub(/ /, '_')}\">#{link_text}</a>"
+
+        end
       end
 
       html
@@ -999,14 +999,18 @@ eos
         index = prev_next_list.index(path)
       end
 
-      prev_path = prev_next_list[index - 1]
 
       # The `nil' test ensures that Jekyll will not terminate when no
       # valid index is returned.
       if index != nil
-        html = "<a href=\"#{prev_path}\">Previous</a>"
+        prev_path = prev_next_list[index - 1]
+        html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">Previous</a>"
       end
+
       if !@text.empty?
+        if prev_path != nil
+          prev_path = prev_path.gsub(/ /, '_')
+        end
 
         if @text =~ /^ *#{Regexp.quote(@prev_with_parens)} *$/
           html = "<a href=\"#{prev_path}\">Previous (\
@@ -1014,7 +1018,8 @@ eos
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_only_name)} *$/
-          html = "<a href=\"#{prev_path}\">#{File.basename prev_path}</a>"
+          html = "<a href=\"#{prev_path}\"\
+>#{File.basename prev_path}</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_only_prev)} *$/
@@ -1028,7 +1033,8 @@ eos
         if @text =~ /^ *#{Regexp.quote(@prev_custom)} *,/
           replacement =
             @text.gsub(/^ *#{Regexp.quote(@prev_custom)} *,/, '')
-          html = "<a href=\"#{prev_path}\">#{replacement}</a>"
+          html = "<a href=\"#{prev_path}\"\
+>#{replacement}</a>"
         end
 
       end
@@ -1070,22 +1076,28 @@ eos
       if prev_next_list != nil
         idx = prev_next_list.index(path)
 
-        if idx >= (prev_next_list.length - 1)
-          index = -1
-        else
-          index = idx
+        if idx != nil
+          if idx >= (prev_next_list.length - 1)
+            index = -1
+          else
+            index = idx
+          end
         end
 
       end
 
-      next_path = prev_next_list[index + 1]
 
       # The `nil' test ensures that Jekyll will not terminate when no
       # valid index is returned.
       if index != nil
-        html = "<a href=\"#{next_path}\">Next</a>"
+        next_path = prev_next_list[index + 1]
+        html = "<a href=\"#{next_path.gsub(/ /, '_')}\">Next</a>"
       end
+
       if !@text.empty?
+        if next_path != nil
+          next_path = next_path.gsub(/ /, '_')
+        end
 
         if @text =~ /^ *#{Regexp.quote(@next_with_parens)} *$/
           html = "<a href=\"#{next_path}\">Next (\
@@ -1216,12 +1228,10 @@ eos
     def render(context)
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
-      path = context.registers[:page]['path']
-      toc = toc_tree.find('/' +
-                          File.dirname(context.registers[:page]['path']),
-                          toc_tree.root, true)
+      path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
 
-      if toc.name != toc_tree.top_level_dir_name
+      if toc.respond_to?(:name) && toc.name != toc_tree.top_level_dir_name
         current = toc
 
         if !@text.empty?
@@ -1268,12 +1278,11 @@ eos
     def render(context)
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
-      path = context.registers[:page]['path']
-      toc = toc_tree.find('/' +
-                          File.dirname(context.registers[:page]['path']),
-                          toc_tree.root, true)
+      path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
 
-      if toc.name != toc_tree.top_level_dir_name
+      if  toc.respond_to?(:name) &&
+          toc.name != toc_tree.top_level_dir_name
         siblings = toc_tree.siblings toc
         if siblings.length > 0
           html << @text.strip
@@ -1308,12 +1317,11 @@ eos
     def render(context)
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
-      path = context.registers[:page]['path']
-      toc = toc_tree.find('/' +
-                          File.dirname(context.registers[:page]['path']),
-                          toc_tree.root, true)
+      path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
+      toc = toc_tree.find('/' + path, toc_tree.root, true)
 
-      if toc.name != toc_tree.top_level_dir_name
+      if toc.respond_to?(:name) &&
+          toc.name != toc_tree.top_level_dir_name
         children = toc.children
         if children.length > 0
           html << @text.strip
@@ -1356,22 +1364,22 @@ eos
       path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
       toc = toc_tree.find('/' + path, toc_tree.root, true)
 
-      if toc.name != toc_tree.top_level_dir_name
-        children = toc.children
-        if children.length > 0
-          if @text =~ /.*,.*/
-            html << @text.gsub(/^.*,/, '').strip
-          end
-          html << '<ul>'
-          children.each do |child|
-            html << "<li><a\
- href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
-          end
-          html << '</ul>'
+      # if toc.name != toc_tree.top_level_dir_name
+      children = toc.children
+      if children.length > 0
+        if @text =~ /.*,.*/
+          html << @text.gsub(/^.*,/, '').strip
         end
-      else
-        ''  # Do not render anything.
+        html << '<ul>'
+        children.each do |child|
+          html << "<li><a\
+ href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
+        end
+        html << '</ul>'
       end
+      # else
+      #   ''  # Do not render anything.
+      # end
 
       html
     end
@@ -1402,18 +1410,14 @@ eos
       path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
       toc = toc_tree.find('/' + path, toc_tree.root, true)
 
-      if toc.name != toc_tree.top_level_dir_name
-        subtree_html << toc.html(:children_only => true)
-        if subtree_html != ''
-          if @text =~ /.*,.*/
-            html << @text.gsub(/^.*,/, '').strip
-          end
-          html << '<ul>'
-          html << subtree_html
-          html << '</ul>'
+      subtree_html << toc.html(:children_only => true)
+      if subtree_html != ''
+        if @text =~ /.*,.*/
+          html << @text.gsub(/^.*,/, '').strip
         end
-      else
-        ''  # Do not render anything.
+        html << '<ul>'
+        html << subtree_html
+        html << '</ul>'
       end
 
       html
