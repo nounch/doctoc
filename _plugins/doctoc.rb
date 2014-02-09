@@ -162,7 +162,7 @@ module Jekyll
 
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name.gsub(/ /, '_')}\">#{File.basename(c.name).gsub(/_/, ' ')}</a></li>"
+ #{class_attr}href=\"#{c.name}\">#{File.basename(c.name).gsub(/_/, ' ')}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -211,7 +211,7 @@ module Jekyll
 
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name.gsub(/ /, '_')}\">#{File.basename(@name)}</a>"
+ #{class_attr}href=\"#{@name}\">#{File.basename(@name)}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
@@ -298,36 +298,36 @@ module Jekyll
 
 # Top level
 1:
-  - colors
-  - animals
+  - Public Interface
+  - Private Interface
 
 # Second level of indentation
 2:
-  - dark
-  - bright
+  - Setters
+  - Getters
 
-  - more nonsense
-  - nonsense
+  - Info
+  - Warnings
 
 # Third level of indentation
 3:
-  - orange
-  - yellow
-  - red
+  - user
+  - post
+  - comment
 
-  - CDE Truck
-  - ABC Truck
+  - email
+  - news and other things
 
-  - blue
-  - purple
+  - admin
+  - test
 
 #==========================================================================
 # The `all' section includes a sorting order which should be applied
 # throughout all indentation levels.
 #==========================================================================
 all:
-  - FGH Truck
-  - IJK Truck
+  - Important
+  - Diverse
 eos
         @custom_sort_array = self.generate_custom_sort_array
       end
@@ -526,7 +526,7 @@ eos
           separator = options[:separator] + ' '
           parent_names[0..-2].each_with_index do |name, i|
             html << "<ul><li>#{separator if i > 0}<a\
- href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
+ href=\"#{name}\">#{File.basename(name)}</a>"
           end
 
           # The child should not be link since it is the current page
@@ -550,7 +550,7 @@ span>#{File.basename(File.basename(parent_names[-1].gsub(/_/, ' ')))}</span></li
 
           parent_names[0..-2].each_with_index do |name, i|
             html << "#{separator if i > 0}<a\
- href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
+ href=\"#{name}\">#{File.basename(name)}</a>"
           end
           # The child should not be link since it is the current page
           # anyway. Hide it if there are no parents.
@@ -864,7 +864,7 @@ eos
                            '')
             end
 
-            html += "<a href=\"#{path.gsub(/ /, '_')}\">#{link_text}</p>"
+            html += "<a href=\"#{path}\">#{link_text}</p>"
 
           else
             if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
@@ -956,7 +956,7 @@ eos
           if toc.name == File.dirname(context.registers[:page]['path'])
             toc.name = File.dirname toc.name
           end
-          html += "<a href=\"#{toc.name.gsub(/ /, '_')}\">#{link_text}</a>"
+          html += "<a href=\"#{toc.name}\">#{link_text}</a>"
 
         end
       end
@@ -1004,7 +1004,7 @@ eos
       # valid index is returned.
       if index != nil
         prev_path = prev_next_list[index - 1]
-        html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">Previous</a>"
+        html = "<a href=\"#{prev_path}\">Previous</a>"
       end
 
       if !@text.empty?
@@ -1091,7 +1091,7 @@ eos
       # valid index is returned.
       if index != nil
         next_path = prev_next_list[index + 1]
-        html = "<a href=\"#{next_path.gsub(/ /, '_')}\">Next</a>"
+        html = "<a href=\"#{next_path}\">Next</a>"
       end
 
       if !@text.empty?
@@ -1373,7 +1373,7 @@ eos
         html << '<ul>'
         children.each do |child|
           html << "<li><a\
- href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
+ href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
         end
         html << '</ul>'
       end
