@@ -162,7 +162,7 @@ module Jekyll
 
             html <<
               "<li><a\
- #{class_attr}href=\"#{c.name}\">#{File.basename(c.name).gsub(/_/, ' ')}</a></li>"
+ #{class_attr}href=\"#{c.name.gsub(/ /, '_')}\">#{File.basename(c.name)}</a></li>"
           end
           html << '</ul>'
           html.join("\n")
@@ -211,7 +211,7 @@ module Jekyll
 
         html <<
           "<li><a\
- #{class_attr}href=\"#{@name}\">#{File.basename(@name)}</a>"
+ #{class_attr}href=\"#{@name.gsub(/ /, '_')}\">#{File.basename(@name)}</a>"
 
         # Leaf nodes should not be lists themselves
         if !@children.empty?
@@ -269,7 +269,7 @@ module Jekyll
 
       def initialize(root, options)
         options = { :site => nil, :top_level_dir_name =>
-          '/pages', :leaf_node_file_names =>
+          'pages', :leaf_node_file_names =>
           ['index.html', 'index.markdown', 'index.md',
            'index.textile'] }.merge(options)
 
@@ -298,36 +298,36 @@ module Jekyll
 
 # Top level
 1:
-  - Public Interface
-  - Private Interface
+  - colors
+  - animals
 
 # Second level of indentation
 2:
-  - Setters
-  - Getters
+  - dark
+  - bright
 
-  - Info
-  - Warnings
+  - more nonsense
+  - nonsense
 
 # Third level of indentation
 3:
-  - user
-  - post
-  - comment
+  - orange
+  - yellow
+  - red
 
-  - email
-  - news and other things
+  - CDE Truck
+  - ABC Truck
 
-  - admin
-  - test
+  - blue
+  - purple
 
 #==========================================================================
 # The `all' section includes a sorting order which should be applied
 # throughout all indentation levels.
 #==========================================================================
 all:
-  - Important
-  - Diverse
+  - FGH Truck
+  - IJK Truck
 eos
         @custom_sort_array = self.generate_custom_sort_array
       end
@@ -526,7 +526,7 @@ eos
           separator = options[:separator] + ' '
           parent_names[0..-2].each_with_index do |name, i|
             html << "<ul><li>#{separator if i > 0}<a\
- href=\"#{name}\">#{File.basename(name)}</a>"
+ href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
           end
 
           # The child should not be link since it is the current page
@@ -550,7 +550,7 @@ span>#{File.basename(File.basename(parent_names[-1].gsub(/_/, ' ')))}</span></li
 
           parent_names[0..-2].each_with_index do |name, i|
             html << "#{separator if i > 0}<a\
- href=\"#{name}\">#{File.basename(name)}</a>"
+ href=\"#{name.gsub(/ /, '_')}\">#{File.basename(name)}</a>"
           end
           # The child should not be link since it is the current page
           # anyway. Hide it if there are no parents.
@@ -654,7 +654,7 @@ eos
         super
         @tree = {}
         @nested_list = ''
-        @top_level_dir_name = '/pages'
+        @top_level_dir_name = 'pages'
         @prev_next_list = []
         @leaf_node_file_names = ['index.html', 'index.markdown',
                                  'index.md', 'index.textile']
@@ -685,9 +685,9 @@ eos
                                   File.basename(parent_path),
                                   'doctoc' => toc,
                                   'path' =>
-                                  File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, ''),
+                                  File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, '').gsub(/ /, '_'),
                                             @index_page_file_name),
-                                  'current_node' => File.basename(k),
+                                  'current_node' => File.basename(k.gsub(/ /, '_')),
                                   'doctoc_prev_next_list' =>
                                   @prev_next_list
                                 },
@@ -695,7 +695,7 @@ eos
 
                 index_page.render(site.layouts, site.site_payload)
                 # index_page.write(site.dest)
-                index_page.write(File.join(site.dest, k))
+                index_page.write(File.join(site.dest, k.gsub(/ /, '_')))
                 site.pages << index_page
 
                 # This may become a future feature.
@@ -724,6 +724,7 @@ eos
 
           path.split("/").inject("") do |sub_path, dir|
             sub_path = File.join(sub_path, dir)
+            sub_path = sub_path.gsub(/^\//, '') if sub_path != '/'
             sub_path = sub_path.gsub(/_/, ' ')
 
             if (current[sub_path] == nil || current[sub_path] == false) &&
@@ -744,7 +745,7 @@ eos
         # entry in the config  file (`_config.yml' in the latest Jekyll
         # version), use the default top level dir name (`/pages').
         begin
-          @top_level_dir_name = '/' +
+          @top_level_dir_name =
             site.config['doctoc_dir'].gsub(/\/$/, '').gsub(/^\//, '') ||
             @top_level_dir_name
 
@@ -778,8 +779,11 @@ eos
                    :top_level_dir_name => @top_level_dir_name,
                    :leaf_node_file_names => @leaf_node_file_names)
 
-        path_tree.insert_pathes({ @top_level_dir_name =>
-                                  @tree[@top_level_dir_name] })
+        top_level_tree = @tree[@top_level_dir_name] || nil
+        if top_level_tree != nil && top_level_tree != ''
+          path_tree.insert_pathes({ @top_level_dir_name =>
+                                    top_level_tree })
+        end
 
         path_tree.sort :node => path_tree.root, :order =>
           'lexical', :reverse => false
@@ -844,7 +848,7 @@ eos
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       # In case there is no TOC node found or the TOC node that has been
       # found is a leaf node there should not be any HTML emitted.
@@ -864,7 +868,7 @@ eos
                            '')
             end
 
-            html += "<a href=\"#{path}\">#{link_text}</p>"
+            html += "<a href=\"#{path.gsub(/ /, '_')}\">#{link_text}</p>"
 
           else
             if @text =~ / *#{Regexp.quote(@parent_node_marker)} */
@@ -931,7 +935,7 @@ eos
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
-      toc = toc_tree.find_parent('/' + path)
+      toc = toc_tree.find_parent(path)
 
 
       if toc.respond_to? :name
@@ -956,7 +960,7 @@ eos
           if toc.name == File.dirname(context.registers[:page]['path'])
             toc.name = File.dirname toc.name
           end
-          html += "<a href=\"#{toc.name}\">#{link_text}</a>"
+          html += "<a href=\"#{toc.name.gsub(/ /, '_')}\">#{link_text}</a>"
 
         end
       end
@@ -988,8 +992,7 @@ eos
       html = ''
 
       path =
-        File.dirname(File.join('/',
-                               context.registers[:page]['path'])).gsub(/_/,
+        File.dirname(File.join(context.registers[:page]['path'])).gsub(/_/,
                                                                        ' ')
       prev_next_list =
         context.registers[:site].data[:toc_tree].prev_next_list
@@ -1004,7 +1007,7 @@ eos
       # valid index is returned.
       if index != nil
         prev_path = prev_next_list[index - 1]
-        html = "<a href=\"#{prev_path}\">Previous</a>"
+        html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">Previous</a>"
       end
 
       if !@text.empty?
@@ -1013,27 +1016,27 @@ eos
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_with_parens)} *$/
-          html = "<a href=\"#{prev_path}\">Previous (\
+          html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">Previous (\
 #{File.basename prev_path})</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_only_name)} *$/
-          html = "<a href=\"#{prev_path}\"\
+          html = "<a href=\"#{prev_path.gsub(/ /, '_')}\"\
 >#{File.basename prev_path}</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_only_prev)} *$/
-          html = "<a href=\"#{prev_path}\">Previous</a>"
+          html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">Previous</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_only_prev_small_caps)} *$/
-          html = "<a href=\"#{prev_path}\">previous</a>"
+          html = "<a href=\"#{prev_path.gsub(/ /, '_')}\">previous</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@prev_custom)} *,/
           replacement =
             @text.gsub(/^ *#{Regexp.quote(@prev_custom)} *,/, '')
-          html = "<a href=\"#{prev_path}\"\
+          html = "<a href=\"#{prev_path.gsub(/ /, '_')}\"\
 >#{replacement}</a>"
         end
 
@@ -1066,8 +1069,7 @@ eos
       html = ''
 
       path =
-        File.dirname(File.join('/',
-                               context.registers[:page]['path'])).gsub(/_/,
+        File.dirname(File.join(context.registers[:page]['path'])).gsub(/_/,
                                                                        ' ')
       prev_next_list =
         context.registers[:site].data[:toc_tree].prev_next_list
@@ -1091,7 +1093,7 @@ eos
       # valid index is returned.
       if index != nil
         next_path = prev_next_list[index + 1]
-        html = "<a href=\"#{next_path}\">Next</a>"
+        html = "<a href=\"#{next_path.gsub(/ /, '_')}\">Next</a>"
       end
 
       if !@text.empty?
@@ -1100,26 +1102,26 @@ eos
         end
 
         if @text =~ /^ *#{Regexp.quote(@next_with_parens)} *$/
-          html = "<a href=\"#{next_path}\">Next (\
+          html = "<a href=\"#{next_path.gsub(/ /, '_')}\">Next (\
 #{File.basename next_path})</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@next_only_name)} *$/
-          html = "<a href=\"#{next_path}\">#{File.basename next_path}</a>"
+          html = "<a href=\"#{next_path.gsub(/ /, '_')}\">#{File.basename next_path}</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@next_only_next)} *$/
-          html = "<a href=\"#{next_path}\">Next</a>"
+          html = "<a href=\"#{next_path.gsub(/ /, '_')}\">Next</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@next_only_next_small_caps)} *$/
-          html = "<a href=\"#{next_path}\">next</a>"
+          html = "<a href=\"#{next_path.gsub(/ /, '_')}\">next</a>"
         end
 
         if @text =~ /^ *#{Regexp.quote(@next_custom)} *,/
           replacement =
             @text.gsub(/^ *#{Regexp.quote(@next_custom)} *,/, '')
-          html = "<a href=\"#{next_path}\">#{replacement}</a>"
+          html = "<a href=\"#{next_path.gsub(/ /, '_')}\">#{replacement}</a>"
         end
 
       end
@@ -1229,7 +1231,7 @@ eos
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       if toc.respond_to?(:name) && toc.name != toc_tree.top_level_dir_name
         current = toc
@@ -1279,7 +1281,7 @@ eos
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       if  toc.respond_to?(:name) &&
           toc.name != toc_tree.top_level_dir_name
@@ -1289,7 +1291,7 @@ eos
           html << '<ul>'
           siblings.each do |sibling|
             html << "<li><a\
- href=\"#{sibling.name}\">#{File.basename(sibling.name)}</a></li>"
+ href=\"#{sibling.name.gsub(/ /, '_')}\">#{File.basename(sibling.name)}</a></li>"
           end
           html << '</ul>'
         end
@@ -1318,7 +1320,7 @@ eos
       html = ''
       toc_tree = context.registers[:site].data[:toc_tree]
       path = File.dirname(context.registers[:page]['path']).gsub(/_/, ' ')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       if toc.respond_to?(:name) &&
           toc.name != toc_tree.top_level_dir_name
@@ -1328,7 +1330,7 @@ eos
           html << '<ul>'
           children.each do |child|
             html << "<li><a\
- href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
+ href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
           end
           html << '</ul>'
         end
@@ -1362,7 +1364,7 @@ eos
         path = @text.gsub(/,.*/, '').strip
       end
       path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       # if toc.name != toc_tree.top_level_dir_name
       children = toc.children
@@ -1373,7 +1375,7 @@ eos
         html << '<ul>'
         children.each do |child|
           html << "<li><a\
- href=\"#{child.name}\">#{File.basename(child.name)}</a></li>"
+ href=\"#{child.name.gsub(/ /, '_')}\">#{File.basename(child.name)}</a></li>"
         end
         html << '</ul>'
       end
@@ -1408,7 +1410,7 @@ eos
         path = @text.gsub(/,.*/, '').strip
       end
       path = path.gsub(/_/, ' ').gsub(/\/$/, '').gsub(/^\//, '')
-      toc = toc_tree.find('/' + path, toc_tree.root, true)
+      toc = toc_tree.find(path, toc_tree.root, true)
 
       subtree_html << toc.html(:children_only => true)
       if subtree_html != ''
