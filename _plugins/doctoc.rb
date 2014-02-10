@@ -679,7 +679,7 @@ eos
                   IndexPage.new(site, site.source,
                                 '/',
                                 @index_page_file_name, {
-                                  'parent' => parent_path,
+                                  'parent' => parent_path.gsub(/ /, '_'),
                                   'has_parent' => has_parent,
                                   'parent_name' =>
                                   File.basename(parent_path),
@@ -687,7 +687,7 @@ eos
                                   'path' =>
                                   File.join(path_tree.find(k, path_tree.root).name.gsub(/^\//, '').gsub(/ /, '_'),
                                             @index_page_file_name),
-                                  'current_node' => File.basename(k.gsub(/ /, '_')),
+                                  'current_node' => File.basename(k.gsub(/_/, ' ')),
                                   'doctoc_prev_next_list' =>
                                   @prev_next_list
                                 },
