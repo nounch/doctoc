@@ -4,6 +4,8 @@ DocToc is a documentation helper plugin for Jekyll.
 
 It scans a nested directory structure in the root of your Jekyll project, constructs a hierarchical tree from it and provides various navigation elements in the form of Liquid tags. It also offers different sorting instructions and automatically adds missing index pages in directories where none are specified so that no navigation link points to a non-existing page.
 
+You can see it document itself [here](http://nounch.github.io/doctoc-documentation/doc/About/).
+
 ## About This Project
 
 This repository is a complete Jekyll project which acts as development environment for the DocToc plugin. The plugin itself lives in `_plugins/`.
